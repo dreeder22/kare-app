@@ -5,6 +5,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState([])
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
+  const [revenueYear, setRevenueYear] = useState('All')
 
   useEffect(() => {
     async function fetchData() {
@@ -39,7 +40,9 @@ export default function Dashboard() {
   const todayRevenue = orders.filter(o => o.fields['Created At'] === todayISO)
   const totalRevenue = todayRevenue.reduce((sum, o) => sum + (o.fields['Total Price'] || 0), 0)
   const monthlyRevenue = orders.filter(o => o.fields['Created At']?.startsWith(monthPrefix)).reduce((sum, o) => sum + (o.fields['Total Price'] || 0), 0)
-  const allTimeRevenue = orders.reduce((sum, o) => sum + (o.fields['Total Price'] || 0), 0)
+  const years = [...new Set(orders.map(o => o.fields['Created At']?.substring(0, 4)).filter(Boolean))].sort().reverse()
+  const filteredOrders = revenueYear === 'All' ? orders : orders.filter(o => o.fields['Created At']?.startsWith(revenueYear))
+  const allTimeRevenue = filteredOrders.reduce((sum, o) => sum + (o.fields['Total Price'] || 0), 0)
   const avgCTR = todayStats.length ? (todayStats.reduce((sum, ad) => sum + (ad.fields.CTR || 0), 0) / todayStats.length).toFixed(2) : 0
 
   if (loading) return <div className="p-8 text-gray-400">Loading...</div>
@@ -83,7 +86,17 @@ export default function Dashboard() {
           <p className="text-2xl font-bold">${monthlyRevenue.toFixed(2)}</p>
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-          <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">All-Time Revenue</p>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs text-gray-500 uppercase tracking-wide">Revenue</p>
+            <select
+              value={revenueYear}
+              onChange={e => setRevenueYear(e.target.value)}
+              className="bg-gray-800 border border-gray-700 rounded px-2 py-0.5 text-xs text-white focus:outline-none"
+            >
+              <option value="All">All Time</option>
+              {years.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
           <p className="text-2xl font-bold">${allTimeRevenue.toFixed(2)}</p>
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
