@@ -25,7 +25,7 @@ export default function Dashboard() {
     fetchData()
   }, [])
 
-  const today = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })
+  const today = new Date().toISOString().split('T')[0]
   console.log('Today formatted:', today, 'Sample date from stats:', stats[0]?.fields['Date'])
   const todayStats = stats.filter(ad => ad.fields['Date'] === today)
   const totalSpend = todayStats.reduce((sum, ad) => sum + (ad.fields.Spend || 0), 0)
