@@ -33,7 +33,9 @@ export default function Dashboard() {
   const totalImpressions = todayStats.reduce((sum, ad) => sum + (ad.fields.Impressions || 0), 0)
   const avgROAS = todayStats.length ? (todayStats.reduce((sum, ad) => sum + (ad.fields.ROAS || 0), 0) / todayStats.length).toFixed(2) : 0
   const activeAds = todayStats.filter(ad => ad.fields['Ad Status'] === 'ACTIVE').length
-  const totalRevenue = orders.reduce((sum, o) => sum + (o.fields['Total Price'] || 0), 0)
+  const todayFormatted = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })
+  const todayRevenue = orders.filter(o => o.fields['Created At']?.startsWith(todayFormatted))
+  const totalRevenue = todayRevenue.reduce((sum, o) => sum + (o.fields['Total Price'] || 0), 0)
   const avgCTR = todayStats.length ? (todayStats.reduce((sum, ad) => sum + (ad.fields.CTR || 0), 0) / todayStats.length).toFixed(2) : 0
 
   if (loading) return <div className="p-8 text-gray-400">Loading...</div>
@@ -74,7 +76,7 @@ export default function Dashboard() {
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
           <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Ads Running</p>
-          <p className="text-2xl font-bold">{stats.length}</p>
+          <p className="text-2xl font-bold">{todayStats.length}</p>
         </div>
       </div>
     </div>
