@@ -33,7 +33,7 @@ export default function Dashboard() {
   const totalImpressions = todayStats.reduce((sum, ad) => sum + (ad.fields.Impressions || 0), 0)
   const avgROAS = todayStats.length ? (todayStats.reduce((sum, ad) => sum + (ad.fields.ROAS || 0), 0) / todayStats.length).toFixed(2) : 0
   const activeAds = todayStats.filter(ad => ad.fields['Ad Status'] === 'ACTIVE').length
-  const todayFormatted = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })
+  const todayFormatted = new Date().toISOString().split('T')[0]
   const todayRevenue = orders.filter(o => o.fields['Created At']?.startsWith(todayFormatted))
   const totalRevenue = todayRevenue.reduce((sum, o) => sum + (o.fields['Total Price'] || 0), 0)
   const currentMonth = new Date().toLocaleDateString('en-US', { month: 'numeric', year: 'numeric' })
