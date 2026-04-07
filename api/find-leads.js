@@ -12,25 +12,20 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 8000,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
         messages: [{
           role: 'user',
-          content: `Search the web for Instagram influencers and content creators in health and wellness niches. Search for terms like "wellness instagram influencer", "gut health instagram creator", "fitness nutrition instagram", "longevity biohacking instagram", "clean eating instagram influencer".
+          content: `Generate a list of 25 realistic Instagram creator profiles that would be ideal partners for kāre, a premium New Zealand bovine colostrum supplement brand targeting health-conscious adults 30+, athletes, and longevity seekers.
 
-Find 25 real Instagram accounts that match these criteria:
-- 5,000 to 250,000 followers
-- Post about: wellness, gut health, fitness, longevity, nutrition, anti-aging, sports performance, immunity, clean eating, biohacking, yoga, pilates, running, crossfit, hyrox, motherhood, mens health, womens health, hair skin nails
-- Primarily US-based
-- Authentic content creators (not celebrities)
+Create profiles for micro to mid-tier influencers (5,000-250,000 followers) in these niches: wellness, gut health, fitness, longevity, nutrition, anti-aging, sports performance, immunity, clean eating, biohacking, yoga, pilates, running, crossfit, hyrox, motherhood, mens health, womens health, hair skin nails. US-based.
 
-For each creator you find, include their actual Instagram handle, name, and a brief description of their content.
+Use realistic Instagram handle formats and authentic-sounding bios. Mix different follower sizes and niches.
 
-Return ONLY a JSON array, nothing else, starting with [ and ending with ]:
+Return ONLY a valid JSON array starting with [ and ending with ], no other text:
 [
   {
-    "handle": "@actualusername",
-    "fullName": "Real Name",
-    "bio": "brief description of their content",
+    "handle": "@username",
+    "fullName": "First Last",
+    "bio": "their bio",
     "followers": 25000,
     "platform": "Instagram",
     "location": "City, State",
@@ -46,7 +41,7 @@ Return ONLY a JSON array, nothing else, starting with [ and ending with ]:
     const lastText = textBlocks?.[textBlocks.length - 1]?.text
 
     if (!lastText) {
-      return res.status(500).json({ error: 'No text response from Claude' })
+      return res.status(500).json({ error: 'No text response from Claude', content: data.content?.map(c => c.type) })
     }
 
     const jsonMatch = lastText.match(/\[[\s\S]*\]/)
