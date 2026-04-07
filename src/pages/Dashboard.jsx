@@ -34,26 +34,11 @@ export default function Dashboard() {
   const totalImpressions = todayStats.reduce((sum, ad) => sum + (ad.fields.Impressions || 0), 0)
   const avgROAS = todayStats.length ? (todayStats.reduce((sum, ad) => sum + (ad.fields.ROAS || 0), 0) / todayStats.length).toFixed(2) : 0
   const activeAds = todayStats.filter(ad => ad.fields['Ad Status'] === 'ACTIVE').length
-  const currentMonth = new Date().toLocaleDateString('en-US', { month: 'numeric', year: 'numeric' })
-  console.log('Current month:', currentMonth, 'Sample order date:', orders[0]?.fields['Created At'])
-  const todayRevenue = orders.filter(o => {
-    const date = o.fields['Created At'] || ''
-    const parts = date.split('/')
-    if (parts.length < 3) return false
-    const orderMonth = parseInt(parts[0])
-    const orderDay = parseInt(parts[1])
-    const orderYear = parseInt(parts[2])
-    return orderMonth === new Date().getMonth() + 1 && orderDay === new Date().getDate() && orderYear === new Date().getFullYear()
-  }).reduce((sum, o) => sum + (o.fields['Total Price'] || 0), 0)
-  const totalRevenue = todayRevenue
-  const monthlyRevenue = orders.filter(o => {
-    const date = o.fields['Created At'] || ''
-    const parts = date.split('/')
-    if (parts.length < 3) return false
-    const orderMonth = parseInt(parts[0])
-    const orderYear = parseInt(parts[2])
-    return orderMonth === new Date().getMonth() + 1 && orderYear === new Date().getFullYear()
-  }).reduce((sum, o) => sum + (o.fields['Total Price'] || 0), 0)
+  const todayISO = new Date().toISOString().split('T')[0]
+  const monthPrefix = todayISO.substring(0, 7)
+  const todayRevenue = orders.filter(o => o.fields['Created At'] === todayISO)
+  const totalRevenue = todayRevenue.reduce((sum, o) => sum + (o.fields['Total Price'] || 0), 0)
+  const monthlyRevenue = orders.filter(o => o.fields['Created At']?.startsWith(monthPrefix)).reduce((sum, o) => sum + (o.fields['Total Price'] || 0), 0)
   const avgCTR = todayStats.length ? (todayStats.reduce((sum, ad) => sum + (ad.fields.CTR || 0), 0) / todayStats.length).toFixed(2) : 0
 
   if (loading) return <div className="p-8 text-gray-400">Loading...</div>
