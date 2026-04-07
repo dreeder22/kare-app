@@ -37,6 +37,7 @@ export default function Dashboard() {
   const todayRevenue = orders.filter(o => o.fields['Created At']?.startsWith(todayFormatted))
   const totalRevenue = todayRevenue.reduce((sum, o) => sum + (o.fields['Total Price'] || 0), 0)
   const currentMonth = new Date().toLocaleDateString('en-US', { month: 'numeric', year: 'numeric' })
+  console.log('Current month:', currentMonth, 'Sample order date:', orders[0]?.fields['Created At'])
   const monthlyRevenue = orders.filter(o => {
     const date = o.fields['Created At'] || ''
     const parts = date.split('/')
