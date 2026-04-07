@@ -9,12 +9,12 @@ export default function Dashboard() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const today = new Date().toISOString().split('T')[0]
         const [statsData, ordersData] = await Promise.all([
-          getRecords('Daily Ad Stats', `?filterByFormula=({Date}="${today}")`),
+          getRecords('Daily Ad Stats'),
           getRecords('Orders')
         ])
         setStats(statsData)
+        console.log('Stats loaded:', statsData.length, statsData[0]?.fields)
         setOrders(ordersData)
       } catch (err) {
         console.error(err)
@@ -25,15 +25,19 @@ export default function Dashboard() {
     fetchData()
   }, [])
 
-  const totalSpend = stats.reduce((sum, ad) => sum + (ad.fields.Spend || 0), 0)
-  const totalConversions = stats.reduce((sum, ad) => sum + (ad.fields.Conversions || 0), 0)
-  const totalImpressions = stats.reduce((sum, ad) => sum + (ad.fields.Impressions || 0), 0)
-  const avgROAS = stats.length ? (stats.reduce((sum, ad) => sum + (ad.fields.ROAS || 0), 0) / stats.length).toFixed(2) : 0
-  const activeAds = stats.filter(ad => ad.fields['Ad Status'] === 'ACTIVE').length
+  const today = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })
+  console.log('Today formatted:', today, 'Sample date from stats:', stats[0]?.fields['Date'])
+  const todayStats = stats.filter(ad => ad.fields['Date'] === today)
+  const totalSpend = todayStats.reduce((sum, ad) => sum + (ad.fields.Spend || 0), 0)
+  const totalConversions = todayStats.reduce((sum, ad) => sum + (ad.fields.Conversions || 0), 0)
+  const totalImpressions = todayStats.reduce((sum, ad) => sum + (ad.fields.Impressions || 0), 0)
+  const avgROAS = todayStats.length ? (todayStats.reduce((sum, ad) => sum + (ad.fields.ROAS || 0), 0) / todayStats.length).toFixed(2) : 0
+  const activeAds = todayStats.filter(ad => ad.fields['Ad Status'] === 'ACTIVE').length
   const totalRevenue = orders.reduce((sum, o) => sum + (o.fields['Total Price'] || 0), 0)
-  const avgCTR = stats.length ? (stats.reduce((sum, ad) => sum + (ad.fields.CTR || 0), 0) / stats.length).toFixed(2) : 0
+  const avgCTR = todayStats.length ? (todayStats.reduce((sum, ad) => sum + (ad.fields.CTR || 0), 0) / todayStats.length).toFixed(2) : 0
 
   if (loading) return <div className="p-8 text-gray-400">Loading...</div>
+  if (!stats.length) return <div className="p-8 text-yellow-400">No stats loaded. Stats array is empty.</div>
 
   return (
     <div className="p-8">
