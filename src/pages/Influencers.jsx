@@ -85,7 +85,7 @@ export default function Influencers() {
     setGenerating(lead.id)
 
     try {
-      const response = await fetch('http://localhost:3001/api/generate-dm', {
+      const response = await fetch('/api/generate-dm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -127,7 +127,7 @@ export default function Influencers() {
   async function syncAllHistory() {
     setSyncingAll(true)
     try {
-      const res = await fetch('http://localhost:3001/api/goaffpro-sync', {
+      const res = await fetch('/api/goaffpro-sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({})
