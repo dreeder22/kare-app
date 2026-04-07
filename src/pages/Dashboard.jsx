@@ -16,6 +16,7 @@ export default function Dashboard() {
         setStats(statsData)
         console.log('Stats loaded:', statsData.length, statsData[0]?.fields)
         setOrders(ordersData)
+        console.log('Order sample:', ordersData[0]?.fields, 'Created At value:', ordersData[0]?.fields['Created At'])
       } catch (err) {
         console.error(err)
       } finally {
