@@ -363,6 +363,7 @@ export default function Influencers() {
                 <th className="text-left px-4 py-3 text-gray-400 uppercase tracking-wide text-xs whitespace-nowrap">Tier</th>
                 <th className="text-left px-4 py-3 text-gray-400 uppercase tracking-wide text-xs whitespace-nowrap">Status</th>
                 <th className="text-left px-4 py-3 text-gray-400 uppercase tracking-wide text-xs whitespace-nowrap">Discount Code</th>
+                <th className="text-left px-4 py-3 text-gray-400 uppercase tracking-wide text-xs whitespace-nowrap">Whitelist</th>
                 <th className="text-left px-4 py-3 text-gray-400 uppercase tracking-wide text-xs whitespace-nowrap border-l border-gray-700">All-Time Sales</th>
                 <th className="text-left px-4 py-3 text-gray-400 uppercase tracking-wide text-xs whitespace-nowrap">All-Time Comm.</th>
                 <th className="text-left px-4 py-3 text-gray-400 uppercase tracking-wide text-xs whitespace-nowrap">All-Time Units</th>
@@ -402,6 +403,20 @@ export default function Influencers() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-gray-400">{creator.fields['Discount Code'] || '—'}</td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => {
+                          const handle = creator.fields['Handle'] || creator.fields['Full Name'] || 'creator'
+                          const link = `https://app.leadsie.com/whitelist/kare?customUserId=${encodeURIComponent(handle)}`
+                          navigator.clipboard.writeText(link)
+                          alert(`Leadsie link copied for ${handle}`)
+                        }}
+                        className="px-3 py-1 rounded text-xs font-semibold text-black whitespace-nowrap"
+                        style={{backgroundColor: '#B8963E'}}
+                      >
+                        Copy Link
+                      </button>
+                    </td>
                     <td className="px-4 py-3 border-l border-gray-700">${(creator.fields['Total Sales'] || 0).toFixed(2)}</td>
                     <td className="px-4 py-3">${(creator.fields['Total Commissions'] || 0).toFixed(2)}</td>
                     <td className="px-4 py-3">{creator.fields['Total Units'] || 0}</td>
