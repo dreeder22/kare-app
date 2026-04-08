@@ -445,29 +445,47 @@ export default function Influencers() {
                 <th className="text-left px-4 py-3 text-gray-400 uppercase tracking-wide text-xs">Deadline</th>
                 <th className="text-left px-4 py-3 text-gray-400 uppercase tracking-wide text-xs">Revenue</th>
                 <th className="text-left px-4 py-3 text-gray-400 uppercase tracking-wide text-xs">Rating</th>
+                <th className="text-left px-4 py-3 text-gray-400 uppercase tracking-wide text-xs">Send</th>
               </tr>
             </thead>
             <tbody>
-              {campaigns.map(camp => (
-                <tr key={camp.id} className="border-b border-gray-800 hover:bg-gray-800 transition-colors">
-                  <td className="px-4 py-3 font-medium">{camp.fields['Campaign Name']}</td>
-                  <td className="px-4 py-3 text-gray-400">{camp.fields['Linked Creator'] ? camp.fields['Linked Creator'][0] : '—'}</td>
-                  <td className="px-4 py-3 text-gray-400">{camp.fields['Content Type'] || '—'}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      camp.fields['Pipeline Stage'] === 'Posted' ? 'bg-green-900 text-green-400' :
-                      camp.fields['Pipeline Stage'] === 'Review Content' ? 'bg-yellow-900 text-yellow-400' :
-                      camp.fields['Pipeline Stage'] === 'Awaiting Content' ? 'bg-blue-900 text-blue-400' :
-                      'bg-gray-800 text-gray-400'
-                    }`}>
-                      {camp.fields['Pipeline Stage'] || 'Needs Brief'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-400">{camp.fields['Posting Deadline'] || '—'}</td>
-                  <td className="px-4 py-3">${(camp.fields['Revenue Generated'] || 0).toFixed(2)}</td>
-                  <td className="px-4 py-3 text-gray-400">{camp.fields['Rating'] || '—'}</td>
-                </tr>
-              ))}
+              {campaigns.map(camp => {
+                const creatorId = camp.fields['Linked Creator']?.[0]
+                const creator = creators.find(c => c.id === creatorId)
+                const creatorName = creator?.fields['Full Name'] || creator?.fields['Handle'] || '—'
+                return (
+                  <tr key={camp.id} className="border-b border-gray-800 hover:bg-gray-800 transition-colors">
+                    <td className="px-4 py-3 font-medium">{camp.fields['Campaign Name']}</td>
+                    <td className="px-4 py-3 text-gray-400">{creatorName}</td>
+                    <td className="px-4 py-3 text-gray-400">{camp.fields['Content Type'] || '—'}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 rounded-full text-xs ${
+                        camp.fields['Pipeline Stage'] === 'Posted' ? 'bg-green-900 text-green-400' :
+                        camp.fields['Pipeline Stage'] === 'Review Content' ? 'bg-yellow-900 text-yellow-400' :
+                        camp.fields['Pipeline Stage'] === 'Awaiting Content' ? 'bg-blue-900 text-blue-400' :
+                        'bg-gray-800 text-gray-400'
+                      }`}>
+                        {camp.fields['Pipeline Stage'] || 'Needs Brief'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-400">{camp.fields['Posting Deadline'] || '—'}</td>
+                    <td className="px-4 py-3">${(camp.fields['Revenue Generated'] || 0).toFixed(2)}</td>
+                    <td className="px-4 py-3 text-gray-400">{camp.fields['Rating'] || '—'}</td>
+                    <td className="px-4 py-3">
+                      {camp.fields['Pipeline Stage'] === 'Needs Brief' && (
+                        <button
+                          onClick={() => sendBriefAndContract(camp)}
+                          disabled={sending === camp.id}
+                          className="px-3 py-1 rounded text-xs font-semibold text-black disabled:opacity-50 whitespace-nowrap"
+                          style={{backgroundColor: '#B8963E'}}
+                        >
+                          {sending === camp.id ? 'Sending...' : 'Send Brief & Contract'}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
           {campaigns.length === 0 && <div className="p-8 text-center text-gray-500">No creator campaigns yet.</div>}
