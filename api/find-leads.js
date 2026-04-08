@@ -2,10 +2,10 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   try {
-    // Step 1: Get existing leads from Airtable
     const airtableToken = process.env.VITE_AIRTABLE_TOKEN
     const baseId = process.env.VITE_AIRTABLE_BASE_ID
 
+    // Get existing handles to deduplicate
     let existingHandles = new Set()
     let offset = null
     do {
@@ -20,10 +20,24 @@ export default async function handler(req, res) {
       offset = existingData.offset || null
     } while (offset)
 
-    console.log(`Found ${existingHandles.size} existing leads`)
+    // Multi-turn Claude web search
+    const messages = [{
+      role: 'user',
+      content: `Search Instagram for 35 real health and wellness creators. Search for terms like "wellness instagram creator", "gut health influencer instagram", "fitness nutrition creator", "longevity instagram", "clean eating influencer".
 
-    // Step 2: Generate new leads with Claude
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+For each creator found, return their real Instagram handle, full name, follower count, bio, location and niche.
+
+Requirements:
+- 5,000 to 250,000 followers
+- Health, wellness, fitness, gut health, longevity, nutrition, anti-aging, sports performance, immunity, clean eating, biohacking, yoga, pilates, running, crossfit, hyrox, motherhood, mens health, womens health niches
+- US-based preferred
+- Must be real verifiable Instagram accounts
+
+After searching, return ONLY a valid JSON array:
+[{"handle":"@realusername","fullName":"Real Name","bio":"their bio","followers":25000,"platform":"Instagram","location":"City, State","nicheTags":["wellness"]}]`
+    }]
+
+    let response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -33,51 +47,64 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 8000,
-        messages: [{
-          role: 'user',
-          content: `Generate a list of 35 realistic Instagram creator profiles that would be ideal partners for kāre, a premium New Zealand bovine colostrum supplement brand targeting health-conscious adults 30+, athletes, and longevity seekers.
-
-Create profiles for micro to mid-tier influencers (5,000-250,000 followers) in these niches: wellness, gut health, fitness, longevity, nutrition, anti-aging, sports performance, immunity, clean eating, biohacking, yoga, pilates, running, crossfit, hyrox, motherhood, mens health, womens health, hair skin nails. US-based.
-
-Use realistic Instagram handle formats and authentic-sounding bios. Mix different follower sizes and niches. Make sure all handles are unique and varied.
-
-Return ONLY a valid JSON array starting with [ and ending with ], no other text:
-[
-  {
-    "handle": "@username",
-    "fullName": "First Last",
-    "bio": "their bio",
-    "followers": 25000,
-    "platform": "Instagram",
-    "location": "City, State",
-    "nicheTags": ["wellness", "gut_health"]
-  }
-]`
-        }]
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        messages
       })
     })
 
-    const data = await response.json()
+    let data = await response.json()
+
+    // Handle multi-turn tool use
+    while (data.stop_reason === 'tool_use') {
+      const toolUseBlocks = data.content.filter(c => c.type === 'tool_use')
+      const toolResults = []
+
+      for (const toolUse of toolUseBlocks) {
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: toolUse.id,
+          content: 'Search completed'
+        })
+      }
+
+      messages.push({ role: 'assistant', content: data.content })
+      messages.push({ role: 'user', content: toolResults })
+
+      response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 8000,
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+          messages
+        })
+      })
+
+      data = await response.json()
+    }
+
     const textBlocks = data.content?.filter(c => c.type === 'text')
     const lastText = textBlocks?.[textBlocks.length - 1]?.text
 
     if (!lastText) {
-      return res.status(500).json({ error: 'No text response from Claude' })
+      return res.status(500).json({ error: 'No text response', contentTypes: data.content?.map(c => c.type) })
     }
 
     const jsonMatch = lastText.match(/\[[\s\S]*\]/)
     if (!jsonMatch) {
-      return res.status(500).json({ error: 'No JSON array found', raw: lastText.substring(0, 500) })
+      return res.status(500).json({ error: 'No JSON found', raw: lastText.substring(0, 500) })
     }
 
     const allLeads = JSON.parse(jsonMatch[0])
-
-    // Step 3: Filter out existing leads
     const newLeads = allLeads.filter(lead =>
       !existingHandles.has(lead.handle.toLowerCase())
     )
 
-    console.log(`Generated ${allLeads.length} leads, ${newLeads.length} are new`)
     res.json({ leads: newLeads, count: newLeads.length, skipped: allLeads.length - newLeads.length })
   } catch (err) {
     console.error(err)

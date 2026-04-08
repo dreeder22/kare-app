@@ -160,6 +160,19 @@ export default function Influencers() {
     }
   }
 
+  async function deleteLead(leadId) {
+    if (!confirm('Delete this lead?')) return
+    try {
+      await fetch(`https://api.airtable.com/v0/${import.meta.env.VITE_AIRTABLE_BASE_ID}/Leads/${leadId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_AIRTABLE_TOKEN}` }
+      })
+      fetchAll()
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
   async function syncAllHistory() {
     setSyncingAll(true)
     try {
@@ -340,6 +353,12 @@ export default function Influencers() {
                       style={{backgroundColor: '#B8963E'}}
                     >
                       {generating === lead.id ? 'Generating...' : 'Generate DM'}
+                    </button>
+                    <button
+                      onClick={() => deleteLead(lead.id)}
+                      className="px-3 py-1 rounded text-xs font-semibold text-white bg-gray-700 hover:bg-red-900 transition-colors"
+                    >
+                      Delete
                     </button>
                   </td>
                 </tr>

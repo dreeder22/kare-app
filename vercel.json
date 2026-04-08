@@ -1,0 +1,16 @@
+{
+  "functions": {
+    "api/find-leads.js": {
+      "maxDuration": 60
+    },
+    "api/generate-dm.js": {
+      "maxDuration": 60
+    },
+    "api/send-brief.js": {
+      "maxDuration": 60
+    },
+    "api/goaffpro-sync.js": {
+      "maxDuration": 60
+    }
+  }
+}
