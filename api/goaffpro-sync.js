@@ -8,7 +8,7 @@ export default async function handler(req, res) {
     const baseId = process.env.VITE_AIRTABLE_BASE_ID
 
     // Step 1: Get all affiliates
-    const affRes = await fetch('https://api.goaffpro.com/v1/admin/affiliates?fields=id,name,email,ref_code,coupon,status&count=200', {
+    const affRes = await fetch('https://api.goaffpro.com/v1/admin/affiliates?fields=id,name,email,ref_code,coupon,status,instagram&count=200', {
       headers: { 'X-GOAFFPRO-ACCESS-TOKEN': goaffproToken }
     })
     const affData = await affRes.json()
@@ -72,6 +72,7 @@ export default async function handler(req, res) {
       const fields = {
         'GoAffPro ID': String(affiliate.id),
         'Discount Code': affiliate.coupon?.code || affiliate.ref_code || '',
+        'Referral Link': `https://takingkare.com/?ref=${affiliate.ref_code || ''}`,
         'Total Sales': allTime.totalSales,
         'Total Commissions': allTime.totalCommissions,
         'Total Orders': allTime.totalOrders,
@@ -99,7 +100,7 @@ export default async function handler(req, res) {
           body: JSON.stringify({
             fields: {
               ...fields,
-              'Handle': affiliate.coupon?.code || affiliate.ref_code || affiliate.name,
+              'Handle': affiliate.instagram ? `@${affiliate.instagram}` : '',
               'Full Name': affiliate.name,
               'Email': affiliate.email,
               'Status': 'Active',
