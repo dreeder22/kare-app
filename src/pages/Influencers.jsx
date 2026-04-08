@@ -20,6 +20,7 @@ export default function Influencers() {
   const [monthlyStats, setMonthlyStats] = useState([])
   const [syncMonth, setSyncMonth] = useState(new Date().getMonth() + 1)
   const [syncYear, setSyncYear] = useState(new Date().getFullYear())
+  const [sending, setSending] = useState(null)
 
   useEffect(() => {
     fetchAll()
@@ -44,6 +45,41 @@ export default function Influencers() {
       console.error(err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function sendBriefAndContract(camp) {
+    const creatorId = camp.fields['Linked Creator']?.[0]
+    const creator = creators.find(c => c.id === creatorId)
+    if (!creator) return alert('No linked creator found for this campaign')
+
+    const creatorName = creator.fields['Full Name'] || creator.fields['Handle'] || ''
+    const creatorEmail = creator.fields['Email'] || ''
+    if (!creatorEmail) return alert(`No email found for ${creatorName}`)
+
+    setSending(camp.id)
+    try {
+      const res = await fetch('/api/send-brief', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          creatorName,
+          creatorHandle: creator.fields['Handle'] || '',
+          creatorEmail,
+          discountCode: creator.fields['Discount Code'] || '',
+          creatorLink: creator.fields['Creator Link'] || ''
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        alert(`Brief & agreement sent to ${creatorEmail}`)
+      } else {
+        alert(`Error: ${data.error}`)
+      }
+    } catch (err) {
+      alert(`Failed to send: ${err.message}`)
+    } finally {
+      setSending(null)
     }
   }
 
