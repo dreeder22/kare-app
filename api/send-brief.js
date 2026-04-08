@@ -20,7 +20,7 @@ export default async function handler(req, res) {
       email: creatorEmail,
       first_name: creatorName.split(' ')[0],
       last_name: creatorName.split(' ').slice(1).join(' ') || '',
-      role: 'Creator'
+      role: 'Client'
     }
   ]
 
