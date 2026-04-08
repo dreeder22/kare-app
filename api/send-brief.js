@@ -29,7 +29,9 @@ export default async function handler(req, res) {
     { name: 'creator_handle', value: creatorHandle || '' },
     { name: 'creator_email', value: creatorEmail },
     { name: 'discount_code', value: discountCode || '' },
+    { name: 'creator_code', value: discountCode || '' },
     { name: 'creator_link', value: creatorLink || '' },
+    { name: 'discount_link', value: creatorLink || '' },
     { name: 'month_year', value: monthYear },
     { name: 'effective_date', value: effectiveDate }
   ]
