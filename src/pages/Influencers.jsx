@@ -298,7 +298,19 @@ export default function Influencers() {
             <tbody>
               {leads.map(lead => (
                 <tr key={lead.id} className="border-b border-gray-800 hover:bg-gray-800 transition-colors">
-                  <td className="px-4 py-3 font-medium">{lead.fields['Handle']}</td>
+                  <td className="px-4 py-3 font-medium">
+                    {lead.fields['Handle'] ? (
+                      <a
+                        href={`https://www.instagram.com/${lead.fields['Handle'].replace('@', '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline"
+                        style={{color: '#B8963E'}}
+                      >
+                        {lead.fields['Handle']}
+                      </a>
+                    ) : '—'}
+                  </td>
                   <td className="px-4 py-3 text-gray-400">{lead.fields['Full Name'] || '—'}</td>
                   <td className="px-4 py-3">{(lead.fields['Followers'] || 0).toLocaleString()}</td>
                   <td className="px-4 py-3 text-gray-400">{lead.fields['Platform'] || '—'}</td>
