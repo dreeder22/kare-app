@@ -51,7 +51,7 @@ export default async function handler(req, res) {
     })
     const briefDoc = await briefRes.json()
     console.log('Brief created:', briefDoc.id, briefDoc.status)
-    if (briefDoc.detail) throw new Error('Brief error: ' + briefDoc.detail)
+    if (briefDoc.detail || briefDoc.error) throw new Error('Brief error: ' + JSON.stringify(briefDoc))
 
     // Wait for document to be ready
     await new Promise(r => setTimeout(r, 3000))
