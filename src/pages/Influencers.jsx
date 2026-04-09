@@ -21,6 +21,7 @@ export default function Influencers() {
   const [syncMonth, setSyncMonth] = useState(new Date().getMonth() + 1)
   const [syncYear, setSyncYear] = useState(new Date().getFullYear())
   const [sending, setSending] = useState(null)
+  const [findingLeads, setFindingLeads] = useState(false)
 
   useEffect(() => {
     fetchAll()
@@ -173,6 +174,53 @@ export default function Influencers() {
     }
   }
 
+  async function findLeads() {
+    setFindingLeads(true)
+    try {
+      const res = await fetch('http://localhost:3001/api/find-leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      })
+      const data = await res.json()
+      if (data.error) {
+        alert('Error: ' + data.error)
+      } else {
+        // Save leads to Airtable
+        let saved = 0
+        for (const lead of data.leads) {
+          await fetch(`https://api.airtable.com/v0/${import.meta.env.VITE_AIRTABLE_BASE_ID}/Leads`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${import.meta.env.VITE_AIRTABLE_TOKEN}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              fields: {
+                'Handle': lead.handle,
+                'Full Name': lead.fullName,
+                'Bio': lead.bio,
+                'Followers': lead.followers,
+                'Platform': lead.platform || 'Instagram',
+                'Location': lead.location,
+                'Outreach Status': 'Pending',
+                'How Discovered': 'AI Daily',
+                'Date Added': new Date().toISOString().split('T')[0]
+              }
+            })
+          })
+          saved++
+        }
+        alert(`Found ${data.count} new leads (${data.skipped} duplicates skipped). ${saved} saved.`)
+        fetchAll()
+      }
+    } catch (err) {
+      alert('Could not connect to local server. Make sure npm run dev:all is running.')
+    } finally {
+      setFindingLeads(false)
+    }
+  }
+
   async function syncAllHistory() {
     setSyncingAll(true)
     try {
@@ -201,13 +249,23 @@ export default function Influencers() {
           <p className="text-gray-400">Manage leads, outreach, creators and campaigns</p>
         </div>
         {tab === 'leads' && (
-          <button
-            onClick={() => setShowAddLead(true)}
-            className="px-4 py-2 rounded-lg text-sm font-semibold text-black"
-            style={{backgroundColor: '#B8963E'}}
-          >
-            + Add Lead
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={findLeads}
+              disabled={findingLeads}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-black disabled:opacity-50"
+              style={{backgroundColor: '#2C2C2A', color: '#B8963E', border: '1px solid #B8963E'}}
+            >
+              {findingLeads ? 'Finding Leads...' : 'Find Leads'}
+            </button>
+            <button
+              onClick={() => setShowAddLead(true)}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-black"
+              style={{backgroundColor: '#B8963E'}}
+            >
+              + Add Lead
+            </button>
+          </div>
         )}
         {tab === 'creators' && (
           <div className="flex items-center gap-3">
