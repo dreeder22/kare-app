@@ -5,7 +5,6 @@ export default async function handler(req, res) {
     const airtableToken = process.env.VITE_AIRTABLE_TOKEN
     const baseId = process.env.VITE_AIRTABLE_BASE_ID
 
-    // Get existing handles to deduplicate
     let existingHandles = new Set()
     let offset = null
     do {
@@ -20,24 +19,20 @@ export default async function handler(req, res) {
       offset = existingData.offset || null
     } while (offset)
 
-    // Multi-turn Claude web search
-    const messages = [{
-      role: 'user',
-      content: `Search Instagram for 35 real health and wellness creators. Search for terms like "wellness instagram creator", "gut health influencer instagram", "fitness nutrition creator", "longevity instagram", "clean eating influencer".
+    const niches = [
+      'wellness gut health instagram creator',
+      'fitness nutrition instagram influencer',
+      'longevity biohacking instagram',
+      'clean eating anti-aging instagram creator',
+      'sports performance recovery instagram',
+      'yoga pilates wellness instagram',
+      'running crossfit hyrox instagram creator',
+      'motherhood health wellness instagram'
+    ]
 
-For each creator found, return their real Instagram handle, full name, follower count, bio, location and niche.
+    const randomNiche = niches[Math.floor(Math.random() * niches.length)]
 
-Requirements:
-- 5,000 to 250,000 followers
-- Health, wellness, fitness, gut health, longevity, nutrition, anti-aging, sports performance, immunity, clean eating, biohacking, yoga, pilates, running, crossfit, hyrox, motherhood, mens health, womens health niches
-- US-based preferred
-- Must be real verifiable Instagram accounts
-
-After searching, return ONLY a valid JSON array:
-[{"handle":"@realusername","fullName":"Real Name","bio":"their bio","followers":25000,"platform":"Instagram","location":"City, State","nicheTags":["wellness"]}]`
-    }]
-
-    let response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -48,51 +43,32 @@ After searching, return ONLY a valid JSON array:
         model: 'claude-sonnet-4-20250514',
         max_tokens: 8000,
         tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        messages
+        tool_choice: { type: 'auto' },
+        messages: [{
+          role: 'user',
+          content: `Search the web for "${randomNiche}" and find 35 real Instagram accounts. Look for their actual Instagram handles, follower counts, and bios.
+
+Then return ONLY a JSON array starting with [ and ending with ]. No other text:
+[{"handle":"@realusername","fullName":"Real Name","bio":"bio text","followers":25000,"platform":"Instagram","location":"City, State","nicheTags":["wellness"]}]`
+        }]
       })
     })
 
-    let data = await response.json()
+    const data = await response.json()
 
-    // Handle multi-turn tool use
-    while (data.stop_reason === 'tool_use') {
-      const toolUseBlocks = data.content.filter(c => c.type === 'tool_use')
-      const toolResults = []
-
-      for (const toolUse of toolUseBlocks) {
-        toolResults.push({
-          type: 'tool_result',
-          tool_use_id: toolUse.id,
-          content: 'Search completed'
-        })
-      }
-
-      messages.push({ role: 'assistant', content: data.content })
-      messages.push({ role: 'user', content: toolResults })
-
-      response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': process.env.ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 8000,
-          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-          messages
-        })
-      })
-
-      data = await response.json()
-    }
-
-    const textBlocks = data.content?.filter(c => c.type === 'text')
-    const lastText = textBlocks?.[textBlocks.length - 1]?.text
+    // Get the last text block from potentially multi-turn response
+    const textBlocks = data.content?.filter(c => c.type === 'text') || []
+    const lastText = textBlocks[textBlocks.length - 1]?.text
 
     if (!lastText) {
-      return res.status(500).json({ error: 'No text response', contentTypes: data.content?.map(c => c.type) })
+      // Claude used tools but didn't finish — extract any partial data
+      console.log('No text block, content types:', data.content?.map(c => c.type))
+      console.log('Stop reason:', data.stop_reason)
+      return res.status(500).json({
+        error: 'No text response',
+        stopReason: data.stop_reason,
+        contentTypes: data.content?.map(c => c.type)
+      })
     }
 
     const jsonMatch = lastText.match(/\[[\s\S]*\]/)
