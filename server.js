@@ -372,7 +372,7 @@ Return ONLY a valid JSON array. Start with [ end with ]. No backticks. No traili
           .map(c => ({
             type: 'tool_result',
             tool_use_id: c.id,
-            content: 'Search completed'
+            content: JSON.stringify(c.input || {})
           }))
 
         messages.push({ role: 'assistant', content: data.content })
@@ -512,7 +512,7 @@ Return ONLY a JSON object with no other text:
         .map(c => ({
           type: 'tool_result',
           tool_use_id: c.id,
-          content: 'Search completed'
+          content: JSON.stringify(c.input || {})
         }))
 
       messages.push({ role: 'assistant', content: data.content })
