@@ -374,6 +374,7 @@ Find real Instagram accounts from the search results. Return ONLY a valid JSON a
         data = await nextRes.json()
       }
 
+      let currentData = null
       // If no text after tool use, ask Claude to summarize
       if (data.stop_reason !== 'end_turn' || !data.content?.some(c => c.type === 'text')) {
         messages.push({ role: 'assistant', content: data.content })
