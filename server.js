@@ -321,13 +321,14 @@ app.post('/api/find-leads', async (req, res) => {
     console.log(`Found ${existingHandles.size} existing leads to deduplicate against`)
 
     const niches = [
-      'gut health nutritionist instagram influencer site:instagram.com OR site:later.com OR site:influencermarketinghub.com',
-      'wellness biohacking instagram creator followers site:modash.io OR site:hypeauditor.com',
-      'fitness nutrition instagram influencer US site:instagram.com OR site:influencermarketinghub.com',
-      'yoga pilates wellness instagram creator site:instagram.com OR site:later.com',
-      'running crossfit hyrox instagram athlete site:instagram.com OR site:influencermarketinghub.com',
-      'anti-aging longevity instagram influencer site:instagram.com OR site:hypeauditor.com',
-      'clean eating motherhood instagram creator site:instagram.com OR site:later.com'
+      'gut health nutritionist instagram micro influencer 10000 50000 followers',
+      'wellness instagram micro influencer under 100k followers',
+      'fitness nutrition instagram creator 5000 50000 followers',
+      'yoga pilates instagram micro influencer small account',
+      'running crossfit hyrox instagram athlete micro influencer',
+      'anti-aging longevity instagram micro influencer',
+      'clean eating motherhood instagram micro influencer under 100k',
+      'immune health supplement instagram creator micro influencer'
     ]
 
     const allLeads = []
@@ -337,11 +338,12 @@ app.post('/api/find-leads', async (req, res) => {
 
       const messages = [{
         role: 'user',
-        content: `Search for: "${niche}"
+        content: `Search for "${niche}".
 
-Find real Instagram micro-influencer accounts (5,000-250,000 followers) from the search results. Avoid celebrities or accounts with over 500k followers. Return ONLY a valid JSON array. Start with [ and end with ]. No backticks. No text before or after. No trailing commas. Only include accounts whose Instagram handle you actually found in the search results:
+Find 3-5 real Instagram accounts that are micro-influencers with between 5,000 and 250,000 followers. Avoid celebrities or anyone with over 250k followers. Look for everyday health creators, not famous people.
 
-[{"handle":"@realhandle","fullName":"Real Name","bio":"bio text","followers":25000,"platform":"Instagram","location":"City, State","nicheTags":["wellness"]},{"handle":"@handle2","fullName":"Name 2","bio":"bio","followers":15000,"platform":"Instagram","location":"City, State","nicheTags":["fitness"]}]`
+Return ONLY a valid JSON array. Start with [ end with ]. No backticks. No trailing commas:
+[{"handle":"@realhandle","fullName":"Real Name","bio":"their bio","followers":25000,"platform":"Instagram","location":"City, State","nicheTags":["wellness"]}]`
       }]
 
       let response = await fetch('https://api.anthropic.com/v1/messages', {
