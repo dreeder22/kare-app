@@ -339,7 +339,7 @@ app.post('/api/find-leads', async (req, res) => {
         role: 'user',
         content: `Search for: "${niche}"
 
-Find real Instagram accounts from the search results. Return ONLY a valid JSON array. Start with [ and end with ]. No backticks. No text before or after. No trailing commas. Only include accounts whose Instagram handle you actually found in the search results:
+Find real Instagram micro-influencer accounts (5,000-250,000 followers) from the search results. Avoid celebrities or accounts with over 500k followers. Return ONLY a valid JSON array. Start with [ and end with ]. No backticks. No text before or after. No trailing commas. Only include accounts whose Instagram handle you actually found in the search results:
 
 [{"handle":"@realhandle","fullName":"Real Name","bio":"bio text","followers":25000,"platform":"Instagram","location":"City, State","nicheTags":["wellness"]},{"handle":"@handle2","fullName":"Name 2","bio":"bio","followers":15000,"platform":"Instagram","location":"City, State","nicheTags":["fitness"]}]`
       }]
@@ -430,8 +430,8 @@ Find real Instagram accounts from the search results. Return ONLY a valid JSON a
           try {
             const leads = JSON.parse(jsonMatch[0])
             const filtered = leads.filter(l =>
-              l.followers >= 5000 &&
-              l.followers <= 250000 &&
+              l.followers >= 1000 &&
+              l.followers <= 500000 &&
               !existingHandles.has(l.handle?.toLowerCase())
             )
             allLeads.push(...filtered)
