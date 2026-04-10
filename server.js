@@ -300,67 +300,110 @@ app.post('/api/goaffpro-sync', async (req, res) => {
 
 app.post('/api/find-leads', async (req, res) => {
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 8000,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        messages: [{
-          role: 'user',
-          content: `Search Instagram and the web to find 25 real Instagram creators who would be a great fit for kāre, a premium New Zealand bovine colostrum supplement brand targeting health-conscious adults 30+, athletes, and longevity seekers.
+    const niches = [
+      'gut health nutritionist instagram influencer site:instagram.com OR site:later.com OR site:influencermarketinghub.com',
+      'wellness biohacking instagram creator followers site:modash.io OR site:hypeauditor.com',
+      'fitness nutrition instagram influencer US site:instagram.com OR site:influencermarketinghub.com',
+      'yoga pilates wellness instagram creator site:instagram.com OR site:later.com',
+      'running crossfit hyrox instagram athlete site:instagram.com OR site:influencermarketinghub.com',
+      'anti-aging longevity instagram influencer site:instagram.com OR site:hypeauditor.com',
+      'clean eating motherhood instagram creator site:instagram.com OR site:later.com'
+    ]
 
-Find creators in these niches: wellness, gut health, fitness, longevity, nutrition, anti-aging, sports performance, immunity, clean eating, biohacking, yoga, pilates, running, crossfit, hyrox, motherhood, mens health, womens health, hair skin nails.
+    const allLeads = []
 
-Requirements:
-- 5,000 to 500,000 followers
-- Primarily US-based
-- Real, verifiable Instagram accounts
-- Authentic health/wellness content
-- Mix of different niches and follower sizes
+    for (const niche of niches) {
+      console.log(`Searching: ${niche}`)
 
-Your final response must be ONLY a valid JSON array with no text before or after:
-[
-  {
-    "handle": "@realusername",
-    "fullName": "Real Name",
-    "bio": "their actual bio or description",
-    "followers": 25000,
-    "platform": "Instagram",
-    "location": "City, State",
-    "nicheTags": ["wellness", "gut_health"]
-  }
-]`
-        }]
+      const messages = [{
+        role: 'user',
+        content: `Search for: "${niche}"
+
+Find real Instagram accounts from the search results. Return ONLY a valid JSON array. Start with [ and end with ]. No backticks. No text before or after. No trailing commas. Only include accounts whose Instagram handle you actually found in the search results:
+
+[{"handle":"@realhandle","fullName":"Real Name","bio":"bio text","followers":25000,"platform":"Instagram","location":"City, State","nicheTags":["wellness"]},{"handle":"@handle2","fullName":"Name 2","bio":"bio","followers":15000,"platform":"Instagram","location":"City, State","nicheTags":["fitness"]}]`
+      }]
+
+      let response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.ANTHROPIC_API_KEY || process.env.VITE_ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 2000,
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+          tool_choice: { type: 'auto' },
+          messages
+        })
       })
-    })
 
-    const data = await response.json()
-    console.log('Content blocks:', data.content?.map(c => c.type))
+      let data = await response.json()
+      let attempts = 0
 
-    const textBlocks = data.content?.filter(c => c.type === 'text')
-    const lastText = textBlocks?.[textBlocks.length - 1]?.text
+      while (data.stop_reason === 'tool_use' && attempts < 3) {
+        attempts++
+        const toolResults = data.content
+          .filter(c => c.type === 'tool_use')
+          .map(c => ({
+            type: 'tool_result',
+            tool_use_id: c.id,
+            content: 'Search completed'
+          }))
 
-    if (!lastText) {
-      return res.status(500).json({ error: 'No text response from Claude' })
+        messages.push({ role: 'assistant', content: data.content })
+        messages.push({ role: 'user', content: toolResults })
+
+        const nextRes = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': process.env.ANTHROPIC_API_KEY || process.env.VITE_ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01'
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 2000,
+            tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+            tool_choice: { type: 'auto' },
+            messages
+          })
+        })
+        data = await nextRes.json()
+      }
+
+      const textBlocks = data.content?.filter(c => c.type === 'text') || []
+      const lastText = textBlocks[textBlocks.length - 1]?.text
+
+      if (lastText) {
+        console.log('Response preview:', lastText.substring(0, 300))
+        const jsonMatch = lastText.match(/\[[\s\S]*\]/)
+        if (jsonMatch) {
+          try {
+            const leads = JSON.parse(jsonMatch[0])
+            const filtered = leads.filter(l => l.followers >= 5000 && l.followers <= 250000)
+            allLeads.push(...filtered)
+            console.log(`Found ${leads.length} leads, ${filtered.length} in follower range`)
+          } catch (e) {
+            console.log('JSON parse failed:', jsonMatch[0].substring(0, 200))
+          }
+        } else {
+          console.log('No JSON match found in response')
+        }
+      } else {
+        console.log('No text block returned')
+      }
+
+      // Small delay between searches
+      await new Promise(r => setTimeout(r, 1000))
     }
 
-    console.log('Claude response:', lastText.substring(0, 200))
-
-    const jsonMatch = lastText.match(/\[[\s\S]*\]/)
-    if (!jsonMatch) {
-      return res.status(500).json({ error: 'No JSON array found', raw: lastText })
-    }
-
-    const leads = JSON.parse(jsonMatch[0])
-    res.json({ leads, count: leads.length })
+    console.log(`Total leads found: ${allLeads.length}`)
+    res.json({ leads: allLeads, count: allLeads.length, skipped: 0 })
   } catch (err) {
-    console.error(err)
+    console.error('Find leads error:', err)
     res.status(500).json({ error: err.message })
   }
 })

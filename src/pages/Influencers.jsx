@@ -177,7 +177,7 @@ export default function Influencers() {
   async function findLeads() {
     setFindingLeads(true)
     try {
-      const res = await fetch('http://localhost:3001/api/find-leads', {
+      const res = await fetch('https://kare-app-production.up.railway.app/api/find-leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({})
