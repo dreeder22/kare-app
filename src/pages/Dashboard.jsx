@@ -29,6 +29,7 @@ export default function Dashboard() {
 
   const today = new Date().toISOString().split('T')[0]
   console.log('Today formatted:', today, 'Sample date from stats:', stats[0]?.fields['Date'])
+  console.log('Stats sample:', stats[0]?.fields, 'Today:', today)
   const todayStats = stats.filter(ad => {
     const date = ad.fields['Date'] || ''
     // Handle both YYYY-MM-DD and M/D/YYYY formats
