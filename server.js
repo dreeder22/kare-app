@@ -476,6 +476,38 @@ app.post('/api/lookup-handle', async (req, res) => {
   try {
     const cleanHandle = handle.replace('@', '').replace('https://www.instagram.com/', '').replace(/\//g, '').replace('#', '').trim()
 
+    // Try Instagram oEmbed API for basic profile info
+    const oembedRes = await fetch(`https://www.instagram.com/${cleanHandle}/?__a=1&__d=dis`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+      }
+    })
+
+    console.log('Instagram API status:', oembedRes.status)
+
+    if (oembedRes.ok) {
+      const text = await oembedRes.text()
+      console.log('Response preview:', text.substring(0, 200))
+
+      // Try to parse as JSON
+      try {
+        const data = JSON.parse(text)
+        const user = data?.graphql?.user || data?.data?.user
+        if (user) {
+          return res.json({
+            fullName: user.full_name || '',
+            bio: user.biography || '',
+            followers: user.edge_followed_by?.count || 0,
+            location: '',
+            nicheTags: []
+          })
+        }
+      } catch (e) {
+        console.log('JSON parse failed')
+      }
+    }
+
+    // Fallback to Claude web search
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -490,30 +522,22 @@ app.post('/api/lookup-handle', async (req, res) => {
         tool_choice: { type: 'auto' },
         messages: [{
           role: 'user',
-          content: `Search for "site:instagram.com ${cleanHandle}" to find this exact Instagram profile.
+          content: `Search for "${cleanHandle} instagram" and return whatever profile information you find. Even partial data is fine.
 
-Extract their full name, bio, follower count, location and content niche from the search results.
-
-Be confident — if you find any data about @${cleanHandle} return it. Don't say you can't find it if you have partial data.
-
-Return ONLY a JSON object:
-{"fullName":"Real Name","bio":"their bio","followers":7100,"location":"Tampa, FL","nicheTags":["lifestyle","wellness"]}`
+Return ONLY a JSON object with whatever you found (use empty string for unknown fields):
+{"fullName":"","bio":"","followers":0,"location":"","nicheTags":[]}`
         }]
       })
     })
 
     const data = await response.json()
-    console.log('Lookup stop reason:', data.stop_reason)
-    console.log('Content types:', data.content?.map(c => c.type))
-
     const textBlocks = data.content?.filter(c => c.type === 'text') || []
     const lastText = textBlocks[textBlocks.length - 1]?.text
-    console.log('Text response:', lastText?.substring(0, 300))
 
-    if (!lastText) return res.status(500).json({ error: 'No response from Claude' })
+    if (!lastText) return res.json({ fullName: '', bio: '', followers: 0, location: '', nicheTags: [] })
 
     const jsonMatch = lastText.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) return res.status(500).json({ error: 'Account not found', raw: lastText.substring(0, 300) })
+    if (!jsonMatch) return res.json({ fullName: '', bio: '', followers: 0, location: '', nicheTags: [] })
 
     const profile = JSON.parse(jsonMatch[0])
     res.json(profile)
