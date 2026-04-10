@@ -389,14 +389,17 @@ Find real Instagram accounts from the search results. Return ONLY a valid JSON a
           body: JSON.stringify({
             model: 'claude-sonnet-4-20250514',
             max_tokens: 2000,
+            tools: [{ type: 'web_search_20250305', name: 'web_search' }],
             messages
           })
         })
-        data = await finalRes.json()
-        console.log('Final response stop reason:', data.stop_reason)
+        const finalData = await finalRes.json()
+        console.log('Final response:', JSON.stringify(finalData).substring(0, 500))
+        currentData = finalData
       }
 
-      const textBlocks = data.content?.filter(c => c.type === 'text') || []
+      const finalContent = currentData || data
+      const textBlocks = finalContent.content?.filter(c => c.type === 'text') || []
       const lastText = textBlocks[textBlocks.length - 1]?.text
 
       if (lastText) {
