@@ -154,6 +154,31 @@ export default function Influencers() {
       })
 
       await updateRecord('Leads', lead.id, { 'Outreach Status': 'Ready to Contact' })
+
+      // Set follow-up reminder dates
+      const today = new Date()
+      const followUp1Date = new Date(today)
+      followUp1Date.setDate(today.getDate() + 4)
+      const followUp2Date = new Date(today)
+      followUp2Date.setDate(today.getDate() + 10)
+      const reEngageDate = new Date(today)
+      reEngageDate.setDate(today.getDate() + 60)
+
+      await fetch(`https://api.airtable.com/v0/${import.meta.env.VITE_AIRTABLE_BASE_ID}/Leads/${lead.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_AIRTABLE_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          fields: {
+            'Follow Up 1 Date': followUp1Date.toISOString().split('T')[0],
+            'Follow Up 2 Date': followUp2Date.toISOString().split('T')[0],
+            'Re-Engage Date': reEngageDate.toISOString().split('T')[0]
+          }
+        })
+      })
+
       fetchAll()
     } catch (err) {
       console.error('DM generation error:', err)
@@ -413,8 +438,29 @@ export default function Influencers() {
               </tr>
             </thead>
             <tbody>
-              {leads.map(lead => (
-                <tr key={lead.id} className="border-b border-gray-800 hover:bg-gray-800 transition-colors">
+              {leads.map(lead => {
+                  const followUp1 = lead.fields['Follow Up 1 Date']
+                  const followUp2 = lead.fields['Follow Up 2 Date']
+                  const reEngage = lead.fields['Re-Engage Date']
+                  const todayStr = new Date().toISOString().split('T')[0]
+                  const status = lead.fields['Outreach Status']
+
+                  let followUpBadge = null
+                  let rowHighlight = ''
+
+                  if (status === 'Contacted' && followUp1 && followUp1 <= todayStr) {
+                    followUpBadge = 'Follow Up 1'
+                    rowHighlight = 'bg-yellow-900 bg-opacity-20'
+                  } else if (status === 'Follow Up 1 Sent' && followUp2 && followUp2 <= todayStr) {
+                    followUpBadge = 'Follow Up 2'
+                    rowHighlight = 'bg-orange-900 bg-opacity-20'
+                  } else if (status === 'Follow Up 2 Sent' && reEngage && reEngage <= todayStr) {
+                    followUpBadge = 'Re-Engage'
+                    rowHighlight = 'bg-blue-900 bg-opacity-20'
+                  }
+
+                  return (
+                <tr key={lead.id} className={`border-b border-gray-800 hover:bg-gray-800 transition-colors ${rowHighlight}`}>
                   <td className="px-4 py-3 font-medium">
                     {lead.fields['Handle'] ? (
                       <a
@@ -432,14 +478,14 @@ export default function Influencers() {
                   <td className="px-4 py-3">{(lead.fields['Followers'] || 0).toLocaleString()}</td>
                   <td className="px-4 py-3 text-gray-400">{lead.fields['Platform'] || '—'}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      lead.fields['Outreach Status'] === 'Accepted' ? 'bg-green-900 text-green-400' :
-                      lead.fields['Outreach Status'] === 'Declined' ? 'bg-red-900 text-red-400' :
-                      lead.fields['Outreach Status'] === 'DM Sent' ? 'bg-blue-900 text-blue-400' :
-                      'bg-gray-800 text-gray-400'
-                    }`}>
-                      {lead.fields['Outreach Status'] || 'Pending'}
-                    </span>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-gray-400 text-xs">{lead.fields['Outreach Status'] || 'Pending'}</span>
+                        {followUpBadge && (
+                          <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-600 text-black w-fit">
+                            {followUpBadge} Due
+                          </span>
+                        )}
+                      </div>
                   </td>
                   <td className="px-4 py-3 text-gray-400">{lead.fields['How Discovered'] || '—'}</td>
                   <td className="px-4 py-3 flex items-center gap-2">
@@ -466,7 +512,8 @@ export default function Influencers() {
                     </button>
                   </td>
                 </tr>
-              ))}
+                  )
+              })}
             </tbody>
           </table>
           {leads.length === 0 && <div className="p-8 text-center text-gray-500">No leads yet — add one manually or wait for AI discovery.</div>}
