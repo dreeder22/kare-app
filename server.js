@@ -340,7 +340,7 @@ app.post('/api/find-leads', async (req, res) => {
         role: 'user',
         content: `Search for "${niche}".
 
-Find 3-5 real Instagram accounts that are micro-influencers with between 5,000 and 250,000 followers. Avoid celebrities or anyone with over 250k followers. Look for everyday health creators, not famous people.
+Find 3-5 real US-based Instagram accounts that are micro-influencers with between 2,500 and 500,000 followers. Must be based in the United States. Avoid celebrities or anyone with over 500k followers. Look for everyday health creators, not famous people.
 
 Return ONLY a valid JSON array. Start with [ end with ]. No backticks. No trailing commas:
 [{"handle":"@realhandle","fullName":"Real Name","bio":"their bio","followers":25000,"platform":"Instagram","location":"City, State","nicheTags":["wellness"]}]`
@@ -432,7 +432,7 @@ Return ONLY a valid JSON array. Start with [ end with ]. No backticks. No traili
           try {
             const leads = JSON.parse(jsonMatch[0])
             const filtered = leads.filter(l =>
-              l.followers >= 1000 &&
+              l.followers >= 2500 &&
               l.followers <= 500000 &&
               !existingHandles.has(l.handle?.toLowerCase())
             )
@@ -452,8 +452,17 @@ Return ONLY a valid JSON array. Start with [ end with ]. No backticks. No traili
       await new Promise(r => setTimeout(r, 1000))
     }
 
-    console.log(`Total leads found: ${allLeads.length}`)
-    res.json({ leads: allLeads, count: allLeads.length, skipped: 0 })
+    // Deduplicate within this run
+    const seen = new Set()
+    const dedupedLeads = allLeads.filter(lead => {
+      const handle = lead.handle?.toLowerCase()
+      if (!handle || seen.has(handle)) return false
+      seen.add(handle)
+      return true
+    })
+
+    console.log(`Total leads found: ${allLeads.length}, after dedup: ${dedupedLeads.length}`)
+    res.json({ leads: dedupedLeads, count: dedupedLeads.length, skipped: allLeads.length - dedupedLeads.length })
   } catch (err) {
     console.error('Find leads error:', err)
     res.status(500).json({ error: err.message })
