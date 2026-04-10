@@ -374,6 +374,28 @@ Find real Instagram accounts from the search results. Return ONLY a valid JSON a
         data = await nextRes.json()
       }
 
+      // If no text after tool use, ask Claude to summarize
+      if (data.stop_reason !== 'end_turn' || !data.content?.some(c => c.type === 'text')) {
+        messages.push({ role: 'assistant', content: data.content })
+        messages.push({ role: 'user', content: [{ type: 'text', text: 'Now return the JSON array of Instagram accounts you found. Start with [ and end with ]. No backticks. No other text.' }] })
+
+        const finalRes = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': process.env.ANTHROPIC_API_KEY || process.env.VITE_ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01'
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 2000,
+            messages
+          })
+        })
+        data = await finalRes.json()
+        console.log('Final response stop reason:', data.stop_reason)
+      }
+
       const textBlocks = data.content?.filter(c => c.type === 'text') || []
       const lastText = textBlocks[textBlocks.length - 1]?.text
 
