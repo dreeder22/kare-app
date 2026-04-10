@@ -448,7 +448,7 @@ export default function Influencers() {
                   let followUpBadge = null
                   let rowHighlight = ''
 
-                  if (status === 'Contacted' && followUp1 && followUp1 <= todayStr) {
+                  if (status === 'DM Sent' && followUp1 && followUp1 <= todayStr) {
                     followUpBadge = 'Follow Up 1'
                     rowHighlight = 'bg-yellow-900 bg-opacity-20'
                   } else if (status === 'Follow Up 1 Sent' && followUp2 && followUp2 <= todayStr) {
