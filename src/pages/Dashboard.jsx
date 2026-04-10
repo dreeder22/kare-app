@@ -30,18 +30,18 @@ export default function Dashboard() {
   const today = new Date().toISOString().split('T')[0]
   console.log('Today formatted:', today, 'Sample date from stats:', stats[0]?.fields['Date'])
   console.log('Stats sample:', stats[0]?.fields, 'Today:', today)
+  const now = new Date()
   const todayStats = stats.filter(ad => {
     const date = ad.fields['Date'] || ''
-    // Handle both YYYY-MM-DD and M/D/YYYY formats
-    if (date.includes('-')) return date === today
-    const parts = date.split('/')
-    if (parts.length < 3) return false
-    const orderMonth = parseInt(parts[0])
-    const orderDay = parseInt(parts[1])
-    const orderYear = parseInt(parts[2])
-    return orderMonth === new Date().getMonth() + 1 &&
-           orderDay === new Date().getDate() &&
-           orderYear === new Date().getFullYear()
+    if (!date) return false
+    if (date.includes('/')) {
+      const parts = date.split('/')
+      if (parts.length < 3) return false
+      return parseInt(parts[0]) === now.getMonth() + 1 &&
+             parseInt(parts[1]) === now.getDate() &&
+             parseInt(parts[2]) === now.getFullYear()
+    }
+    return date === today
   })
   const totalSpend = todayStats.reduce((sum, ad) => sum + (ad.fields.Spend || 0), 0)
   const totalConversions = todayStats.reduce((sum, ad) => sum + (ad.fields.Conversions || 0), 0)
