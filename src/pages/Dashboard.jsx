@@ -29,7 +29,19 @@ export default function Dashboard() {
 
   const today = new Date().toISOString().split('T')[0]
   console.log('Today formatted:', today, 'Sample date from stats:', stats[0]?.fields['Date'])
-  const todayStats = stats.filter(ad => ad.fields['Date'] === today)
+  const todayStats = stats.filter(ad => {
+    const date = ad.fields['Date'] || ''
+    // Handle both YYYY-MM-DD and M/D/YYYY formats
+    if (date.includes('-')) return date === today
+    const parts = date.split('/')
+    if (parts.length < 3) return false
+    const orderMonth = parseInt(parts[0])
+    const orderDay = parseInt(parts[1])
+    const orderYear = parseInt(parts[2])
+    return orderMonth === new Date().getMonth() + 1 &&
+           orderDay === new Date().getDate() &&
+           orderYear === new Date().getFullYear()
+  })
   const totalSpend = todayStats.reduce((sum, ad) => sum + (ad.fields.Spend || 0), 0)
   const totalConversions = todayStats.reduce((sum, ad) => sum + (ad.fields.Conversions || 0), 0)
   const totalImpressions = todayStats.reduce((sum, ad) => sum + (ad.fields.Impressions || 0), 0)
