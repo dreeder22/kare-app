@@ -224,6 +224,9 @@ export default function Influencers() {
 
   async function lookupHandle(handle) {
     if (!handle) return alert('Enter a handle first')
+    // Clean handle from URL if pasted
+    const cleanHandle = '@' + handle.replace('https://www.instagram.com/', '').replace('@', '').replace(/\//g, '').replace('#', '').trim()
+    if (cleanHandle !== handle) setNewLead(prev => ({...prev, handle: cleanHandle}))
     setLookingUp(true)
     try {
       const res = await fetch('https://kare-app-production.up.railway.app/api/lookup-handle', {

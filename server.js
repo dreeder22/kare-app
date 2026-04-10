@@ -474,12 +474,15 @@ app.post('/api/lookup-handle', async (req, res) => {
   if (!handle) return res.status(400).json({ error: 'Handle required' })
 
   try {
-    const cleanHandle = handle.replace('@', '')
+    const cleanHandle = handle.replace('@', '').replace('https://www.instagram.com/', '').replace('/', '').replace('#', '')
+
     const messages = [{
       role: 'user',
-      content: `Search Instagram for the account @${cleanHandle}. Find their full name, bio, follower count, location, and content niche.
+      content: `Search for information about the Instagram account at https://www.instagram.com/${cleanHandle}/
 
-Return ONLY a JSON object:
+Find their full name, bio, follower count, location, and content niche tags.
+
+Return ONLY a JSON object with no other text:
 {"fullName":"Real Name","bio":"their bio","followers":25000,"location":"City, State","nicheTags":["wellness","fitness"]}`
     }]
 
