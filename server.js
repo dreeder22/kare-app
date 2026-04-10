@@ -474,19 +474,9 @@ app.post('/api/lookup-handle', async (req, res) => {
   if (!handle) return res.status(400).json({ error: 'Handle required' })
 
   try {
-    const cleanHandle = handle.replace('@', '').replace('https://www.instagram.com/', '').replace('/', '').replace('#', '')
+    const cleanHandle = handle.replace('@', '').replace('https://www.instagram.com/', '').replace(/\//g, '').replace('#', '').trim()
 
-    const messages = [{
-      role: 'user',
-      content: `Search for information about the Instagram account at https://www.instagram.com/${cleanHandle}/
-
-Find their full name, bio, follower count, location, and content niche tags.
-
-Return ONLY a JSON object with no other text:
-{"fullName":"Real Name","bio":"their bio","followers":25000,"location":"City, State","nicheTags":["wellness","fitness"]}`
-    }]
-
-    let response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -498,56 +488,28 @@ Return ONLY a JSON object with no other text:
         max_tokens: 1000,
         tools: [{ type: 'web_search_20250305', name: 'web_search' }],
         tool_choice: { type: 'auto' },
-        messages
+        messages: [{
+          role: 'user',
+          content: `Search for "${cleanHandle} instagram" and find their Instagram profile information including full name, bio, follower count, location and content niche.
+
+Return ONLY a JSON object:
+{"fullName":"Real Name","bio":"their bio","followers":7100,"location":"Tampa, FL","nicheTags":["lifestyle","wellness"]}`
+        }]
       })
     })
 
-    let data = await response.json()
-    let attempts = 0
-
-    while (data.stop_reason === 'tool_use' && attempts < 3) {
-      attempts++
-      const toolResults = data.content
-        .filter(c => c.type === 'tool_use')
-        .map(c => ({
-          type: 'tool_result',
-          tool_use_id: c.id,
-          content: JSON.stringify(c.input || {})
-        }))
-
-      messages.push({ role: 'assistant', content: data.content })
-      messages.push({ role: 'user', content: toolResults })
-
-      let currentData = null
-      if (data.stop_reason !== 'end_turn' || !data.content?.some(c => c.type === 'text')) {
-        messages.push({ role: 'assistant', content: data.content })
-        messages.push({ role: 'user', content: [{ type: 'text', text: 'Now return the JSON object with their profile info.' }] })
-      }
-
-      const nextRes = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': process.env.VITE_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-          messages
-        })
-      })
-      data = await nextRes.json()
-    }
+    const data = await response.json()
+    console.log('Lookup stop reason:', data.stop_reason)
+    console.log('Content types:', data.content?.map(c => c.type))
 
     const textBlocks = data.content?.filter(c => c.type === 'text') || []
     const lastText = textBlocks[textBlocks.length - 1]?.text
+    console.log('Text response:', lastText?.substring(0, 300))
 
     if (!lastText) return res.status(500).json({ error: 'No response from Claude' })
 
     const jsonMatch = lastText.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) return res.status(500).json({ error: 'No data found', raw: lastText.substring(0, 300) })
+    if (!jsonMatch) return res.status(500).json({ error: 'Account not found', raw: lastText.substring(0, 300) })
 
     const profile = JSON.parse(jsonMatch[0])
     res.json(profile)
