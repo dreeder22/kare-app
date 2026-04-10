@@ -469,4 +469,89 @@ Return ONLY a valid JSON array. Start with [ end with ]. No backticks. No traili
   }
 })
 
+app.post('/api/lookup-handle', async (req, res) => {
+  const { handle } = req.body
+  if (!handle) return res.status(400).json({ error: 'Handle required' })
+
+  try {
+    const cleanHandle = handle.replace('@', '')
+    const messages = [{
+      role: 'user',
+      content: `Search Instagram for the account @${cleanHandle}. Find their full name, bio, follower count, location, and content niche.
+
+Return ONLY a JSON object:
+{"fullName":"Real Name","bio":"their bio","followers":25000,"location":"City, State","nicheTags":["wellness","fitness"]}`
+    }]
+
+    let response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.VITE_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        tool_choice: { type: 'auto' },
+        messages
+      })
+    })
+
+    let data = await response.json()
+    let attempts = 0
+
+    while (data.stop_reason === 'tool_use' && attempts < 3) {
+      attempts++
+      const toolResults = data.content
+        .filter(c => c.type === 'tool_use')
+        .map(c => ({
+          type: 'tool_result',
+          tool_use_id: c.id,
+          content: 'Search completed'
+        }))
+
+      messages.push({ role: 'assistant', content: data.content })
+      messages.push({ role: 'user', content: toolResults })
+
+      let currentData = null
+      if (data.stop_reason !== 'end_turn' || !data.content?.some(c => c.type === 'text')) {
+        messages.push({ role: 'assistant', content: data.content })
+        messages.push({ role: 'user', content: [{ type: 'text', text: 'Now return the JSON object with their profile info.' }] })
+      }
+
+      const nextRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.VITE_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+          messages
+        })
+      })
+      data = await nextRes.json()
+    }
+
+    const textBlocks = data.content?.filter(c => c.type === 'text') || []
+    const lastText = textBlocks[textBlocks.length - 1]?.text
+
+    if (!lastText) return res.status(500).json({ error: 'No response from Claude' })
+
+    const jsonMatch = lastText.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) return res.status(500).json({ error: 'No data found', raw: lastText.substring(0, 300) })
+
+    const profile = JSON.parse(jsonMatch[0])
+    res.json(profile)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
 app.listen(3001, () => console.log('kāre API server running on port 3001'))

@@ -13,6 +13,7 @@ export default function Influencers() {
   const [outreach, setOutreach] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAddLead, setShowAddLead] = useState(false)
+  const [lookingUp, setLookingUp] = useState(false)
   const [newLead, setNewLead] = useState({ handle: '', fullName: '', bio: '', followers: '', platform: 'Instagram', location: '', nicheTags: '' })
   const [generating, setGenerating] = useState(null)
   const [expandedOutreach, setExpandedOutreach] = useState(null)
@@ -221,6 +222,32 @@ export default function Influencers() {
     }
   }
 
+  async function lookupHandle(handle) {
+    if (!handle) return alert('Enter a handle first')
+    setLookingUp(true)
+    try {
+      const res = await fetch('https://kare-app-production.up.railway.app/api/lookup-handle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handle })
+      })
+      const data = await res.json()
+      if (data.error) return alert('Error: ' + data.error)
+      setNewLead(prev => ({
+        ...prev,
+        fullName: data.fullName || prev.fullName,
+        bio: data.bio || prev.bio,
+        followers: data.followers || prev.followers,
+        location: data.location || prev.location,
+        nicheTags: data.nicheTags?.join(', ') || prev.nicheTags
+      }))
+    } catch (err) {
+      alert('Could not connect to server')
+    } finally {
+      setLookingUp(false)
+    }
+  }
+
   async function syncAllHistory() {
     setSyncingAll(true)
     try {
@@ -318,10 +345,26 @@ export default function Influencers() {
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-6">
           <h3 className="font-semibold mb-4">Add New Lead</h3>
           <div className="grid grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Handle *</label>
-              <input value={newLead.handle} onChange={e => setNewLead(n => ({...n, handle: e.target.value}))} placeholder="@handle" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-yellow-600" />
-            </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Handle *</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="@username"
+                        value={newLead.handle}
+                        onChange={e => setNewLead({...newLead, handle: e.target.value})}
+                        className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-600"
+                      />
+                      <button
+                        onClick={() => lookupHandle(newLead.handle)}
+                        disabled={lookingUp}
+                        className="px-3 py-2 rounded-lg text-xs font-semibold disabled:opacity-50 whitespace-nowrap"
+                        style={{backgroundColor: '#B8963E', color: 'black'}}
+                      >
+                        {lookingUp ? 'Looking up...' : 'Lookup'}
+                      </button>
+                    </div>
+                  </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">Full Name</label>
               <input value={newLead.fullName} onChange={e => setNewLead(n => ({...n, fullName: e.target.value}))} placeholder="Full name" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-yellow-600" />
