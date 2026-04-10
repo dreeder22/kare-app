@@ -27,10 +27,11 @@ export default function Dashboard() {
     fetchData()
   }, [])
 
-  const today = new Date().toISOString().split('T')[0]
+  const now = new Date()
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   console.log('Today formatted:', today, 'Sample date from stats:', stats[0]?.fields['Date'])
   console.log('Stats sample:', stats[0]?.fields, 'Today:', today)
-  const now = new Date()
+  console.log('Local date:', today, 'UTC date:', new Date().toISOString().split('T')[0])
   const todayStats = stats.filter(ad => {
     const date = ad.fields['Date'] || ''
     if (!date) return false
