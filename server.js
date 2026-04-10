@@ -300,6 +300,26 @@ app.post('/api/goaffpro-sync', async (req, res) => {
 
 app.post('/api/find-leads', async (req, res) => {
   try {
+    // Get existing handles from Airtable to deduplicate
+    const airtableToken = process.env.VITE_AIRTABLE_TOKEN
+    const baseId = process.env.VITE_AIRTABLE_BASE_ID
+
+    let existingHandles = new Set()
+    let offset = null
+    do {
+      const url = `https://api.airtable.com/v0/${baseId}/Leads?fields[]=Handle${offset ? `&offset=${offset}` : ''}`
+      const existing = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${airtableToken}` }
+      })
+      const existingData = await existing.json()
+      existingData.records?.forEach(r => {
+        if (r.fields['Handle']) existingHandles.add(r.fields['Handle'].toLowerCase())
+      })
+      offset = existingData.offset || null
+    } while (offset)
+
+    console.log(`Found ${existingHandles.size} existing leads to deduplicate against`)
+
     const niches = [
       'gut health nutritionist instagram influencer site:instagram.com OR site:later.com OR site:influencermarketinghub.com',
       'wellness biohacking instagram creator followers site:modash.io OR site:hypeauditor.com',
@@ -409,7 +429,11 @@ Find real Instagram accounts from the search results. Return ONLY a valid JSON a
         if (jsonMatch) {
           try {
             const leads = JSON.parse(jsonMatch[0])
-            const filtered = leads.filter(l => l.followers >= 5000 && l.followers <= 250000)
+            const filtered = leads.filter(l =>
+              l.followers >= 5000 &&
+              l.followers <= 250000 &&
+              !existingHandles.has(l.handle?.toLowerCase())
+            )
             allLeads.push(...filtered)
             console.log(`Found ${leads.length} leads, ${filtered.length} in follower range`)
           } catch (e) {
