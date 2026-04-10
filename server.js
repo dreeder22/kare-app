@@ -490,10 +490,17 @@ app.post('/api/lookup-handle', async (req, res) => {
         tool_choice: { type: 'auto' },
         messages: [{
           role: 'user',
-          content: `Search for "${cleanHandle} instagram" and find their Instagram profile information including full name, bio, follower count, location and content niche.
+          content: `Search for "${cleanHandle} instagram profile" and find information about this Instagram creator.
 
-Return ONLY a JSON object:
-{"fullName":"Real Name","bio":"their bio","followers":7100,"location":"Tampa, FL","nicheTags":["lifestyle","wellness"]}`
+Use the search results to find their full name, bio, follower count, location and content niche. The handle might appear slightly differently in search results. Use your best judgment to identify the correct profile.
+
+From the search results for hannahvictoriafrank, I can see:
+- Look for their name, bio text, follower count
+- Look for their location
+- Identify their content niche from their bio
+
+Return ONLY a JSON object with what you found. If follower count shows as "7.1K" convert to 7100:
+{"fullName":"Real Name","bio":"their bio","followers":7100,"location":"City, State","nicheTags":["lifestyle","wellness"]}`
         }]
       })
     })
