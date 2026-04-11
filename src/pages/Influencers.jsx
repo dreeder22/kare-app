@@ -451,10 +451,10 @@ export default function Influencers() {
                   if (status === 'DM Sent' && followUp1 && followUp1 <= todayStr) {
                     followUpBadge = 'Follow Up 1'
                     rowHighlight = 'bg-yellow-900 bg-opacity-20'
-                  } else if (status === 'Follow Up 1 Sent' && followUp2 && followUp2 <= todayStr) {
+                  } else if (status === 'Follow-up 1' && followUp2 && followUp2 <= todayStr) {
                     followUpBadge = 'Follow Up 2'
                     rowHighlight = 'bg-orange-900 bg-opacity-20'
-                  } else if (status === 'Follow Up 2 Sent' && reEngage && reEngage <= todayStr) {
+                  } else if (status === 'Follow-up 2' && reEngage && reEngage <= todayStr) {
                     followUpBadge = 'Re-Engage'
                     rowHighlight = 'bg-blue-900 bg-opacity-20'
                   }
