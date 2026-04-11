@@ -178,6 +178,9 @@ export default function Influencers() {
           }
         })
       })
+      .then(r => r.json())
+      .then(d => console.log('Follow-up dates set:', d))
+      .catch(err => console.error('Follow-up date error:', err))
 
       fetchAll()
     } catch (err) {
