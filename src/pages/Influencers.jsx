@@ -441,15 +441,16 @@ export default function Influencers() {
       )}
 
       {tab === 'leads' && (
-        <div className="mb-4">
-              <input
-                type="text"
-                placeholder="Search leads by handle, name, or bio..."
-                value={leadSearch}
-                onChange={e => setLeadSearch(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-yellow-600"
-              />
-            </div>
+        <>
+          <div className="mb-4">
+            <input
+              type="text"
+              placeholder="Search leads by handle, name, or bio..."
+              value={leadSearch}
+              onChange={e => setLeadSearch(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-yellow-600"
+            />
+          </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead>
@@ -553,6 +554,7 @@ export default function Influencers() {
           </table>
           {leads.length === 0 && <div className="p-8 text-center text-gray-500">No leads yet — add one manually or wait for AI discovery.</div>}
         </div>
+        </>
       )}
 
       {tab === 'outreach' && (
