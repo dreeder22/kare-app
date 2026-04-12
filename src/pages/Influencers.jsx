@@ -23,6 +23,7 @@ export default function Influencers() {
   const [syncYear, setSyncYear] = useState(new Date().getFullYear())
   const [sending, setSending] = useState(null)
   const [findingLeads, setFindingLeads] = useState(false)
+  const [leadSearch, setLeadSearch] = useState('')
 
   useEffect(() => {
     fetchAll()
@@ -194,6 +195,19 @@ export default function Influencers() {
     if (!confirm('Delete this lead?')) return
     try {
       await fetch(`https://api.airtable.com/v0/${import.meta.env.VITE_AIRTABLE_BASE_ID}/Leads/${leadId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_AIRTABLE_TOKEN}` }
+      })
+      fetchAll()
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  async function deleteOutreach(outreachId) {
+    if (!confirm('Remove from outreach queue?')) return
+    try {
+      await fetch(`https://api.airtable.com/v0/${import.meta.env.VITE_AIRTABLE_BASE_ID}/Outreach Queue/${outreachId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${import.meta.env.VITE_AIRTABLE_TOKEN}` }
       })
@@ -427,6 +441,15 @@ export default function Influencers() {
       )}
 
       {tab === 'leads' && (
+        <div className="mb-4">
+              <input
+                type="text"
+                placeholder="Search leads by handle, name, or bio..."
+                value={leadSearch}
+                onChange={e => setLeadSearch(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-yellow-600"
+              />
+            </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead>
@@ -441,7 +464,16 @@ export default function Influencers() {
               </tr>
             </thead>
             <tbody>
-              {leads.map(lead => {
+              {leads.filter(lead => {
+                if (!leadSearch) return true
+                const search = leadSearch.toLowerCase()
+                return (
+                  lead.fields['Handle']?.toLowerCase().includes(search) ||
+                  lead.fields['Full Name']?.toLowerCase().includes(search) ||
+                  lead.fields['Bio']?.toLowerCase().includes(search) ||
+                  lead.fields['Location']?.toLowerCase().includes(search)
+                )
+              }).map(lead => {
                   const followUp1 = lead.fields['Follow Up 1 Date']
                   const followUp2 = lead.fields['Follow Up 2 Date']
                   const reEngage = lead.fields['Re-Engage Date']
@@ -537,6 +569,12 @@ export default function Influencers() {
                     <span className="text-gray-400 text-sm">{o.fields['Full Name (from Linked Lead)']}</span>
                   )}
                   <span className="text-xs text-gray-500">{o.fields['Date Generated']}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteOutreach(o.id) }}
+                      className="px-2 py-1 rounded text-xs font-semibold text-white bg-gray-700 hover:bg-red-900 transition-colors ml-2"
+                    >
+                      Delete
+                    </button>
                 </div>
                 <span className="text-gray-400">{expandedOutreach === o.id ? '▲' : '▼'}</span>
               </button>
