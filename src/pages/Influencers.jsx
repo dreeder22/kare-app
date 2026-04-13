@@ -75,6 +75,7 @@ export default function Influencers() {
       })
       const data = await res.json()
       if (data.success) {
+        await updateRecord('Creator Campaigns', camp.id, { 'Pipeline Stage': 'Brief/Contract Sent' })
         alert(`Brief & agreement sent to ${creatorEmail}`)
       } else {
         alert(`Error: ${data.error}`)
@@ -83,6 +84,31 @@ export default function Influencers() {
       alert(`Failed to send: ${err.message}`)
     } finally {
       setSending(null)
+    }
+  }
+
+  async function createCampaign(creator) {
+    const campaignName = `${creator.fields['Handle']} — ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`
+    try {
+      await fetch(`https://api.airtable.com/v0/${import.meta.env.VITE_AIRTABLE_BASE_ID}/Creator Campaigns`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_AIRTABLE_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          fields: {
+            'Campaign Name': campaignName,
+            'Linked Creator': [creator.id],
+            'Pipeline Stage': 'Needs Brief'
+          }
+        })
+      })
+      alert(`Campaign created for ${creator.fields['Handle']}`)
+      fetchAll()
+    } catch (err) {
+      alert('Error creating campaign')
+      console.error(err)
     }
   }
 
@@ -625,6 +651,7 @@ export default function Influencers() {
                 <th className="text-left px-4 py-3 text-gray-400 uppercase tracking-wide text-xs whitespace-nowrap">Status</th>
                 <th className="text-left px-4 py-3 text-gray-400 uppercase tracking-wide text-xs whitespace-nowrap">Discount Code</th>
                 <th className="text-left px-4 py-3 text-gray-400 uppercase tracking-wide text-xs whitespace-nowrap">Whitelist</th>
+                <th className="text-left px-4 py-3 text-gray-400 uppercase tracking-wide text-xs whitespace-nowrap">Campaign</th>
                 <th className="text-left px-4 py-3 text-gray-400 uppercase tracking-wide text-xs whitespace-nowrap border-l border-gray-700">All-Time Sales</th>
                 <th className="text-left px-4 py-3 text-gray-400 uppercase tracking-wide text-xs whitespace-nowrap">All-Time Comm.</th>
                 <th className="text-left px-4 py-3 text-gray-400 uppercase tracking-wide text-xs whitespace-nowrap">All-Time Units</th>
@@ -666,11 +693,17 @@ export default function Influencers() {
                     <td className="px-4 py-3 text-gray-400">{creator.fields['Discount Code'] || '—'}</td>
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           const handle = creator.fields['Handle'] || creator.fields['Full Name'] || 'creator'
                           const link = `https://app.leadsie.com/whitelist/kare?customUserId=${encodeURIComponent(handle)}`
                           navigator.clipboard.writeText(link)
                           alert(`Leadsie link copied for ${handle}`)
+                          // Find linked campaign and update stage to Leadsie Sent
+                          const creatorCampaign = campaigns.find(c => c.fields['Linked Creator']?.[0] === creator.id && c.fields['Pipeline Stage'] === 'Brief/Contract Received')
+                          if (creatorCampaign) {
+                            await updateRecord('Creator Campaigns', creatorCampaign.id, { 'Pipeline Stage': 'Leadsie Sent' })
+                            fetchAll()
+                          }
                         }}
                         className="px-3 py-1 rounded text-xs font-semibold text-black whitespace-nowrap"
                         style={{backgroundColor: '#B8963E'}}
@@ -678,6 +711,15 @@ export default function Influencers() {
                         Copy Link
                       </button>
                     </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => createCampaign(creator)}
+                      className="px-3 py-1 rounded text-xs font-semibold whitespace-nowrap"
+                      style={{backgroundColor: '#2C2C2A', color: '#B8963E', border: '1px solid #B8963E'}}
+                    >
+                      + Campaign
+                    </button>
+                  </td>
                     <td className="px-4 py-3 border-l border-gray-700">${(creator.fields['Total Sales'] || 0).toFixed(2)}</td>
                     <td className="px-4 py-3">${(creator.fields['Total Commissions'] || 0).toFixed(2)}</td>
                     <td className="px-4 py-3">{creator.fields['Total Units'] || 0}</td>
