@@ -762,14 +762,23 @@ export default function Influencers() {
                     <td className="px-4 py-3 text-gray-400">{creatorName}</td>
                     <td className="px-4 py-3 text-gray-400">{camp.fields['Content Type'] || '—'}</td>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        camp.fields['Pipeline Stage'] === 'Posted' ? 'bg-green-900 text-green-400' :
-                        camp.fields['Pipeline Stage'] === 'Review Content' ? 'bg-yellow-900 text-yellow-400' :
-                        camp.fields['Pipeline Stage'] === 'Awaiting Content' ? 'bg-blue-900 text-blue-400' :
-                        'bg-gray-800 text-gray-400'
-                      }`}>
-                        {camp.fields['Pipeline Stage'] || 'Needs Brief'}
-                      </span>
+                      <select
+                        value={camp.fields['Pipeline Stage'] || 'Needs Brief'}
+                        onChange={async (e) => {
+                          await updateRecord('Creator Campaigns', camp.id, { 'Pipeline Stage': e.target.value })
+                          fetchAll()
+                        }}
+                        className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-yellow-600"
+                      >
+                        <option>Needs Brief</option>
+                        <option>Brief/Contract Sent</option>
+                        <option>Brief/Contract Received</option>
+                        <option>Leadsie Sent</option>
+                        <option>Waiting for Content</option>
+                        <option>Content Received</option>
+                        <option>Ad Running</option>
+                        <option>Completed</option>
+                      </select>
                     </td>
                     <td className="px-4 py-3 text-gray-400">{camp.fields['Posting Deadline'] || '—'}</td>
                     <td className="px-4 py-3">${(camp.fields['Revenue Generated'] || 0).toFixed(2)}</td>
