@@ -24,6 +24,11 @@ export default function Influencers() {
   const [sending, setSending] = useState(null)
   const [findingLeads, setFindingLeads] = useState(false)
   const [leadSearch, setLeadSearch] = useState('')
+  const [sendingProduct, setSendingProduct] = useState(null)
+  const [showProductForm, setShowProductForm] = useState(null)
+  const [productAddress, setProductAddress] = useState({
+    firstName: '', lastName: '', email: '', address: '', address2: '', city: '', state: '', zip: '', quantity: 1, creatorHandle: ''
+  })
 
   useEffect(() => {
     fetchAll()
@@ -227,6 +232,45 @@ export default function Influencers() {
       fetchAll()
     } catch (err) {
       console.error(err)
+    }
+  }
+
+  async function sendProduct(lead) {
+    setShowProductForm(lead.id)
+    setProductAddress({
+      firstName: '',
+      lastName: '',
+      email: '',
+      address: '',
+      address2: '',
+      city: '',
+      state: '',
+      zip: '',
+      quantity: 1,
+      creatorHandle: lead.fields['Handle'] || ''
+    })
+  }
+
+  async function submitProductOrder() {
+    setSendingProduct(showProductForm)
+    try {
+      const res = await fetch('https://hook.us2.make.com/wd46vhrtb7gbdilpiyp9w61cwm0o5nxi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(productAddress)
+      })
+      if (res.ok) {
+        alert(`Product order created for ${productAddress.creatorHandle}`)
+        setShowProductForm(null)
+        await updateRecord('Leads', showProductForm, { 'Outreach Status': 'Sample Sent' })
+        fetchAll()
+      } else {
+        alert('Error creating order')
+      }
+    } catch (err) {
+      alert('Failed to create order')
+    } finally {
+      setSendingProduct(null)
     }
   }
 
@@ -572,6 +616,13 @@ export default function Influencers() {
                     >
                       Delete
                     </button>
+                    <button
+                      onClick={() => sendProduct(lead)}
+                      className="px-3 py-1 rounded text-xs font-semibold text-black whitespace-nowrap"
+                      style={{backgroundColor: '#B8963E'}}
+                    >
+                      Send Product
+                    </button>
                   </td>
                 </tr>
                   )
@@ -580,6 +631,57 @@ export default function Influencers() {
           </table>
           {leads.length === 0 && <div className="p-8 text-center text-gray-500">No leads yet — add one manually or wait for AI discovery.</div>}
         </div>
+          {showProductForm && (
+            <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+              <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 w-full max-w-md">
+                <h3 className="text-lg font-bold mb-4">Send Product</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">First Name</label>
+                    <input type="text" value={productAddress.firstName} onChange={e => setProductAddress({...productAddress, firstName: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Last Name</label>
+                    <input type="text" value={productAddress.lastName} onChange={e => setProductAddress({...productAddress, lastName: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none" />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs text-gray-400 mb-1">Email</label>
+                    <input type="text" value={productAddress.email} onChange={e => setProductAddress({...productAddress, email: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none" />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs text-gray-400 mb-1">Address</label>
+                    <input type="text" value={productAddress.address} onChange={e => setProductAddress({...productAddress, address: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none" />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs text-gray-400 mb-1">Address 2 (optional)</label>
+                    <input type="text" value={productAddress.address2} onChange={e => setProductAddress({...productAddress, address2: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">City</label>
+                    <input type="text" value={productAddress.city} onChange={e => setProductAddress({...productAddress, city: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">State</label>
+                    <input type="text" placeholder="UT" value={productAddress.state} onChange={e => setProductAddress({...productAddress, state: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Zip</label>
+                    <input type="text" value={productAddress.zip} onChange={e => setProductAddress({...productAddress, zip: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Quantity</label>
+                    <input type="number" min="1" max="5" value={productAddress.quantity} onChange={e => setProductAddress({...productAddress, quantity: parseInt(e.target.value)})} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none" />
+                  </div>
+                </div>
+                <div className="flex gap-3 mt-4">
+                  <button onClick={() => setShowProductForm(null)} className="flex-1 px-4 py-2 rounded-lg text-sm bg-gray-700 text-white">Cancel</button>
+                  <button onClick={submitProductOrder} disabled={sendingProduct} className="flex-1 px-4 py-2 rounded-lg text-sm font-semibold text-black disabled:opacity-50" style={{backgroundColor: '#B8963E'}}>
+                    {sendingProduct ? 'Creating Order...' : 'Create Order'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
 
