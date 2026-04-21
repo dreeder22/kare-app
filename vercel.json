@@ -17,6 +17,9 @@
     },
     "api/auth/shopify/callback.js": {
       "maxDuration": 30
+    },
+    "api/send-product.js": {
+      "maxDuration": 30
     }
   }
 }

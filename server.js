@@ -1,5 +1,6 @@
 import express from 'express'
 import cors from 'cors'
+import { handleSendProduct } from './lib/send-product-handler.js'
 
 const app = express()
 app.use(cors())
@@ -544,6 +545,19 @@ Return ONLY a JSON object with whatever you found (use empty string for unknown 
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/send-product
+// Thin Express wrapper around the shared handler — identical behavior to the
+// Vercel function at api/send-product.js. Both read the same env vars.
+app.post('/api/send-product', async (req, res) => {
+  try {
+    const { status, body } = await handleSendProduct(req.body)
+    res.status(status).json(body)
+  } catch (err) {
+    console.error('send-product handler threw:', err)
+    res.status(500).json({ success: false, error: `Unhandled server error: ${err.message}` })
   }
 })
 
