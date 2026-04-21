@@ -3,6 +3,31 @@ import cors from 'cors'
 import { handleSendProduct } from './lib/send-product-handler.js'
 
 const app = express()
+
+// Route-specific CORS for /api/send-product — registered BEFORE the global
+// cors() middleware so the strict origin list applies to OPTIONS preflight too.
+// (Global cors() would otherwise short-circuit preflight with a permissive `*`.)
+const SEND_PRODUCT_ALLOWED_ORIGINS = new Set([
+  'https://app.takingkare.net',
+  'https://takingkare.net',
+  'https://www.takingkare.net',
+  'http://localhost:5174',
+  'http://localhost:3001'
+])
+function applySendProductCors(req, res) {
+  const origin = req.headers.origin
+  if (origin && SEND_PRODUCT_ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+    res.setHeader('Vary', 'Origin')
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+}
+app.options('/api/send-product', (req, res) => {
+  applySendProductCors(req, res)
+  res.status(204).end()
+})
+
 app.use(cors())
 app.use(express.json())
 app.use((req, res, next) => { console.log(`${req.method} ${req.path}`); next() })
@@ -552,6 +577,7 @@ Return ONLY a JSON object with whatever you found (use empty string for unknown 
 // Thin Express wrapper around the shared handler — identical behavior to the
 // Vercel function at api/send-product.js. Both read the same env vars.
 app.post('/api/send-product', async (req, res) => {
+  applySendProductCors(req, res)
   try {
     const { status, body } = await handleSendProduct(req.body)
     res.status(status).json(body)
