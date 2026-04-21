@@ -11,6 +11,12 @@
     },
     "api/goaffpro-sync.js": {
       "maxDuration": 60
+    },
+    "api/auth/shopify/install.js": {
+      "maxDuration": 10
+    },
+    "api/auth/shopify/callback.js": {
+      "maxDuration": 30
     }
   }
 }
