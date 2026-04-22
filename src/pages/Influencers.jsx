@@ -122,6 +122,7 @@ export default function Influencers() {
   const [sending, setSending] = useState(null)
   const [findingLeads, setFindingLeads] = useState(false)
   const [leadSearch, setLeadSearch] = useState('')
+  const [creatorSearch, setCreatorSearch] = useState('')
   const [sendingProduct, setSendingProduct] = useState(null)
   const [showProductForm, setShowProductForm] = useState(null)
   const [productAddress, setProductAddress] = useState({
@@ -1144,6 +1145,16 @@ export default function Influencers() {
       })()}
 
       {tab === 'creators' && (
+        <>
+          <div className="mb-4">
+            <input
+              type="text"
+              placeholder="Search creators by handle or name..."
+              value={creatorSearch}
+              onChange={e => setCreatorSearch(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-yellow-600"
+            />
+          </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-auto max-h-[600px]">
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-gray-900 z-10">
@@ -1165,7 +1176,16 @@ export default function Influencers() {
               </tr>
             </thead>
             <tbody>
-              {[...creators].sort((a, b) => (b.fields['Total Sales'] || 0) - (a.fields['Total Sales'] || 0)).map(creator => {
+              {[...creators]
+                .filter(creator => {
+                  if (!creatorSearch) return true
+                  const search = creatorSearch.toLowerCase()
+                  return (
+                    creator.fields['Handle']?.toLowerCase().includes(search) ||
+                    creator.fields['Full Name']?.toLowerCase().includes(search)
+                  )
+                })
+                .sort((a, b) => (b.fields['Total Sales'] || 0) - (a.fields['Total Sales'] || 0)).map(creator => {
                 const periodLabel = `${String(syncMonth).padStart(2, '0')}/${syncYear}`
                 const monthly = monthlyStats.find(ms =>
                   ms.fields['Period'] === periodLabel &&
@@ -1235,8 +1255,15 @@ export default function Influencers() {
               })}
             </tbody>
           </table>
-          {creators.length === 0 && <div className="p-8 text-center text-gray-500">No creators yet — leads move here when accepted.</div>}
+          {creators.length === 0
+            ? <div className="p-8 text-center text-gray-500">No creators yet — leads move here when they sign up via GoAffPro.</div>
+            : creatorSearch && !creators.some(c =>
+                c.fields['Handle']?.toLowerCase().includes(creatorSearch.toLowerCase()) ||
+                c.fields['Full Name']?.toLowerCase().includes(creatorSearch.toLowerCase())
+              ) && <div className="p-8 text-center text-gray-500">No creators match "{creatorSearch}".</div>
+          }
         </div>
+        </>
       )}
 
       {tab === 'campaigns' && (
