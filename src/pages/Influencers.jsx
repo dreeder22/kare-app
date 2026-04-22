@@ -27,7 +27,7 @@ export default function Influencers() {
   const [sendingProduct, setSendingProduct] = useState(null)
   const [showProductForm, setShowProductForm] = useState(null)
   const [productAddress, setProductAddress] = useState({
-    firstName: '', lastName: '', email: '', address: '', address2: '', city: '', state: '', zip: '', quantity: 1, creatorHandle: ''
+    firstName: '', lastName: '', email: '', address: '', address2: '', city: '', state: '', zip: '', variant: '', quantity: 1, creatorHandle: ''
   })
 
   useEffect(() => {
@@ -246,6 +246,7 @@ export default function Influencers() {
       city: '',
       state: '',
       zip: '',
+      variant: '',
       quantity: 1,
       creatorHandle: lead.fields['Handle'] || ''
     })
@@ -254,21 +255,42 @@ export default function Influencers() {
   async function submitProductOrder() {
     setSendingProduct(showProductForm)
     try {
-      const res = await fetch('https://hook.us2.make.com/wd46vhrtb7gbdilpiyp9w61cwm0o5nxi', {
+      // Build payload. Omit `quantity` when variant is 'both' — the server
+      // computes line items (1 jar + 1 stick pack) from the variant alone.
+      const payload = {
+        firstName: productAddress.firstName,
+        lastName: productAddress.lastName,
+        email: productAddress.email,
+        address: productAddress.address,
+        address2: productAddress.address2,
+        city: productAddress.city,
+        state: productAddress.state,
+        zip: productAddress.zip,
+        variant: productAddress.variant,
+        creatorHandle: productAddress.creatorHandle,
+        leadRecordId: showProductForm
+      }
+      if (productAddress.variant !== 'both') {
+        payload.quantity = productAddress.quantity
+      }
+
+      const res = await fetch('/api/send-product', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(productAddress)
+        body: JSON.stringify(payload)
       })
-      if (res.ok) {
-        alert(`Product order created for ${productAddress.creatorHandle}`)
+      const data = await res.json().catch(() => ({}))
+
+      if (res.ok && data.success) {
+        const warningSuffix = data.airtableWarning ? `\n\n⚠️ ${data.airtableWarning}` : ''
+        alert(`Order ${data.orderNumber} created!\nView: ${data.orderUrl}${warningSuffix}`)
         setShowProductForm(null)
-        await updateRecord('Leads', showProductForm, { 'Outreach Status': 'Sample Sent' })
         fetchAll()
       } else {
-        alert('Error creating order')
+        alert(`Error creating order: ${data.error || `HTTP ${res.status}`}`)
       }
     } catch (err) {
-      alert('Failed to create order')
+      alert(`Failed to create order: ${err.message}`)
     } finally {
       setSendingProduct(null)
     }
@@ -668,14 +690,29 @@ export default function Influencers() {
                     <label className="block text-xs text-gray-400 mb-1">Zip</label>
                     <input type="text" value={productAddress.zip} onChange={e => setProductAddress({...productAddress, zip: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none" />
                   </div>
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-1">Quantity</label>
-                    <input type="number" min="1" max="5" value={productAddress.quantity} onChange={e => setProductAddress({...productAddress, quantity: parseInt(e.target.value)})} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none" />
+                  <div className="col-span-2">
+                    <label className="block text-xs text-gray-400 mb-1">Variant</label>
+                    <select
+                      value={productAddress.variant}
+                      onChange={e => setProductAddress({...productAddress, variant: e.target.value})}
+                      className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-600"
+                    >
+                      <option value="" disabled>— Select —</option>
+                      <option value="jar">Jar</option>
+                      <option value="sticks">Stick Packs</option>
+                      <option value="both">Both (1 jar + 1 stick pack)</option>
+                    </select>
                   </div>
+                  {productAddress.variant !== 'both' && (
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-1">Quantity</label>
+                      <input type="number" min="1" max="5" value={productAddress.quantity} onChange={e => setProductAddress({...productAddress, quantity: parseInt(e.target.value)})} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none" />
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-3 mt-4">
                   <button onClick={() => setShowProductForm(null)} className="flex-1 px-4 py-2 rounded-lg text-sm bg-gray-700 text-white">Cancel</button>
-                  <button onClick={submitProductOrder} disabled={sendingProduct} className="flex-1 px-4 py-2 rounded-lg text-sm font-semibold text-black disabled:opacity-50" style={{backgroundColor: '#B8963E'}}>
+                  <button onClick={submitProductOrder} disabled={sendingProduct || !productAddress.variant} className="flex-1 px-4 py-2 rounded-lg text-sm font-semibold text-black disabled:opacity-50" style={{backgroundColor: '#B8963E'}}>
                     {sendingProduct ? 'Creating Order...' : 'Create Order'}
                   </button>
                 </div>
