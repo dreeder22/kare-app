@@ -38,8 +38,7 @@ export default function Ads() {
 
   return (
     <div className="p-8">
-      <h2 className="text-2xl font-bold mb-2">Ad Performance</h2>
-      <p className="text-gray-400 mb-6">Daily snapshot of all running ads</p>
+      <h2 className="text-2xl font-bold mb-6">Ad Performance</h2>
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-auto">
         <table className="w-full text-sm">
           <thead>

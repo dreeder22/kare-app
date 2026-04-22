@@ -5,7 +5,7 @@ const OUTREACH_STATUSES = ['Pending', 'Ready to Contact', 'DM Sent', 'Follow-up 
 
 // Tab keys (internal) → user-facing labels.
 const TAB_LABELS = {
-  'leads': 'Leads',
+  'leads': 'Cold Leads',
   'warm-leads': 'Warm Leads',
   'creators': 'Creators',
   'campaigns': 'Creator Campaigns'
@@ -605,7 +605,6 @@ export default function Influencers() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-2xl font-bold mb-1">Influencers</h2>
-          <p className="text-gray-400">Manage leads, outreach, creators and campaigns</p>
         </div>
         {tab === 'leads' && (
           <div className="flex gap-2">
