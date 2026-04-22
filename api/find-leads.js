@@ -18,6 +18,23 @@ export default async function handler(req, res) {
       })
       offset = existingData.offset || null
     } while (offset)
+    const leadsCount = existingHandles.size
+
+    // Also dedup against Blocked Handles — deleted/declined leads must not be
+    // re-suggested by AI discovery. Manual Add Lead bypasses this check.
+    let blockedOffset = null
+    do {
+      const url = `https://api.airtable.com/v0/${baseId}/Blocked%20Handles?fields[]=Handle${blockedOffset ? `&offset=${blockedOffset}` : ''}`
+      const blocked = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${airtableToken}` }
+      })
+      const blockedData = await blocked.json()
+      blockedData.records?.forEach(r => {
+        if (r.fields['Handle']) existingHandles.add(r.fields['Handle'].toLowerCase())
+      })
+      blockedOffset = blockedData.offset || null
+    } while (blockedOffset)
+    console.log(`Dedup set: ${leadsCount} existing leads + ${existingHandles.size - leadsCount} blocked handles = ${existingHandles.size} total`)
 
     const niches = [
       'wellness gut health instagram creator',
