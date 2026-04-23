@@ -1,41 +1,55 @@
-const TOKEN = import.meta.env.VITE_AIRTABLE_TOKEN
-const BASE_ID = import.meta.env.VITE_AIRTABLE_BASE_ID
-const BASE_URL = `https://api.airtable.com/v0/${BASE_ID}`
+// Frontend Airtable client — talks to the backend proxy at /api/airtable/records,
+// which holds the Airtable token server-side. No secrets in this file.
+//
+// Relative /api/* paths resolve to the same origin in production and to the
+// Express dev server via the Vite proxy in vite.config.js during local dev.
 
-const headers = {
-  Authorization: `Bearer ${TOKEN}`,
-  'Content-Type': 'application/json'
-}
+const PROXY_URL = '/api/airtable/records'
 
 export async function getRecords(table, params = '') {
-  let allRecords = []
-  let offset = null
-
-  do {
-    const offsetParam = offset ? `${params ? '&' : '?'}offset=${offset}` : ''
-    const res = await fetch(`${BASE_URL}/${encodeURIComponent(table)}${params}${offsetParam}`, { headers })
-    const data = await res.json()
-    allRecords = [...allRecords, ...(data.records || [])]
-    offset = data.offset || null
-  } while (offset)
-
-  return allRecords
+  const extra = params.startsWith('?') ? params.slice(1) : params
+  const qs = `table=${encodeURIComponent(table)}${extra ? `&${extra}` : ''}`
+  const res = await fetch(`${PROXY_URL}?${qs}`)
+  if (!res.ok) throw new Error(await extractError(res))
+  const data = await res.json()
+  return data.records || []
 }
 
 export async function createRecord(table, fields) {
-  const res = await fetch(`${BASE_URL}/${encodeURIComponent(table)}`, {
+  const res = await fetch(PROXY_URL, {
     method: 'POST',
-    headers,
-    body: JSON.stringify({ fields })
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ table, fields })
   })
-  return await res.json()
+  if (!res.ok) throw new Error(await extractError(res))
+  return res.json()
 }
 
 export async function updateRecord(table, id, fields) {
-  const res = await fetch(`${BASE_URL}/${encodeURIComponent(table)}/${id}`, {
+  const url = `${PROXY_URL}?table=${encodeURIComponent(table)}&id=${encodeURIComponent(id)}`
+  const res = await fetch(url, {
     method: 'PATCH',
-    headers,
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ fields })
   })
-  return await res.json()
+  if (!res.ok) throw new Error(await extractError(res))
+  return res.json()
+}
+
+export async function deleteRecord(table, id) {
+  const url = `${PROXY_URL}?table=${encodeURIComponent(table)}&id=${encodeURIComponent(id)}`
+  const res = await fetch(url, { method: 'DELETE' })
+  if (!res.ok) throw new Error(await extractError(res))
+  return res.json()
+}
+
+async function extractError(res) {
+  try {
+    const data = await res.json()
+    const err = data?.error
+    if (err == null) return `HTTP ${res.status}`
+    return typeof err === 'string' ? err : JSON.stringify(err)
+  } catch {
+    return `HTTP ${res.status}`
+  }
 }

@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { getRecords, createRecord, updateRecord } from '../lib/airtable'
+import { getRecords, createRecord, updateRecord, deleteRecord } from '../lib/airtable'
 
 const OUTREACH_STATUSES = ['Pending', 'Ready to Contact', 'DM Sent', 'Follow-up 1', 'Follow-up 2', 'Declined', 'Re-engage']
 
@@ -209,19 +209,10 @@ export default function Influencers() {
   async function createCampaign(creator) {
     const campaignName = `${creator.fields['Handle']} — ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`
     try {
-      await fetch(`https://api.airtable.com/v0/${import.meta.env.VITE_AIRTABLE_BASE_ID}/Creator Campaigns`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_AIRTABLE_TOKEN}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          fields: {
-            'Campaign Name': campaignName,
-            'Linked Creator': [creator.id],
-            'Pipeline Stage': 'Needs Brief'
-          }
-        })
+      await createRecord('Creator Campaigns', {
+        'Campaign Name': campaignName,
+        'Linked Creator': [creator.id],
+        'Pipeline Stage': 'Needs Brief'
       })
       alert(`Campaign created for ${creator.fields['Handle']}`)
       fetchAll()
@@ -321,23 +312,16 @@ export default function Influencers() {
         const reEngageDate = new Date(today)
         reEngageDate.setDate(today.getDate() + 60)
 
-        await fetch(`https://api.airtable.com/v0/${import.meta.env.VITE_AIRTABLE_BASE_ID}/Leads/${lead.id}`, {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bearer ${import.meta.env.VITE_AIRTABLE_TOKEN}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            fields: {
-              'Follow Up 1 Date': followUp1Date.toISOString().split('T')[0],
-              'Follow Up 2 Date': followUp2Date.toISOString().split('T')[0],
-              'Re-Engage Date': reEngageDate.toISOString().split('T')[0]
-            }
+        try {
+          const updated = await updateRecord('Leads', lead.id, {
+            'Follow Up 1 Date': followUp1Date.toISOString().split('T')[0],
+            'Follow Up 2 Date': followUp2Date.toISOString().split('T')[0],
+            'Re-Engage Date': reEngageDate.toISOString().split('T')[0]
           })
-        })
-        .then(r => r.json())
-        .then(d => console.log('Follow-up dates set:', d))
-        .catch(err => console.error('Follow-up date error:', err))
+          console.log('Follow-up dates set:', updated)
+        } catch (err) {
+          console.error('Follow-up date error:', err)
+        }
       }
 
       await fetchAll()
@@ -359,10 +343,7 @@ export default function Influencers() {
       if (handle) {
         await addToBlocklist(handle, 'Deleted from Leads')
       }
-      await fetch(`https://api.airtable.com/v0/${import.meta.env.VITE_AIRTABLE_BASE_ID}/Leads/${leadId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_AIRTABLE_TOKEN}` }
-      })
+      await deleteRecord('Leads', leadId)
       fetchAll()
     } catch (err) {
       console.error(err)
@@ -390,10 +371,7 @@ export default function Influencers() {
       if (handle) {
         await addToBlocklist(handle, 'Declined from Warm Leads')
       }
-      await fetch(`https://api.airtable.com/v0/${import.meta.env.VITE_AIRTABLE_BASE_ID}/Leads/${lead.id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_AIRTABLE_TOKEN}` }
-      })
+      await deleteRecord('Leads', lead.id)
       fetchAll()
     } catch (err) {
       console.error(err)
@@ -512,27 +490,22 @@ export default function Influencers() {
         // Save leads to Airtable
         let saved = 0
         for (const lead of data.leads) {
-          await fetch(`https://api.airtable.com/v0/${import.meta.env.VITE_AIRTABLE_BASE_ID}/Leads`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${import.meta.env.VITE_AIRTABLE_TOKEN}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              fields: {
-                'Handle': lead.handle,
-                'Full Name': lead.fullName,
-                'Bio': lead.bio,
-                'Followers': lead.followers,
-                'Platform': lead.platform || 'Instagram',
-                'Location': lead.location,
-                'Outreach Status': 'Pending',
-                'How Discovered': 'AI Daily',
-                'Date Added': new Date().toISOString().split('T')[0]
-              }
+          try {
+            await createRecord('Leads', {
+              'Handle': lead.handle,
+              'Full Name': lead.fullName,
+              'Bio': lead.bio,
+              'Followers': lead.followers,
+              'Platform': lead.platform || 'Instagram',
+              'Location': lead.location,
+              'Outreach Status': 'Pending',
+              'How Discovered': 'AI Daily',
+              'Date Added': new Date().toISOString().split('T')[0]
             })
-          })
-          saved++
+            saved++
+          } catch (err) {
+            console.error(`Failed to save lead ${lead.handle}:`, err.message)
+          }
         }
         alert(`Found ${data.count} new leads (${data.skipped} duplicates skipped). ${saved} saved.`)
         fetchAll()
