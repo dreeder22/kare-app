@@ -1,6 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import { handleSendProduct } from './lib/send-product-handler.js'
+import { handleAirtableProxy } from './lib/airtable-proxy-handler.js'
 
 const app = express()
 
@@ -25,6 +26,29 @@ function applySendProductCors(req, res) {
 }
 app.options('/api/send-product', (req, res) => {
   applySendProductCors(req, res)
+  res.status(204).end()
+})
+
+// Route-specific CORS for /api/airtable/records — registered BEFORE global cors()
+// so the strict origin list applies to OPTIONS preflight too.
+const AIRTABLE_PROXY_ALLOWED_ORIGINS = new Set([
+  'https://app.takingkare.net',
+  'https://takingkare.net',
+  'https://www.takingkare.net',
+  'http://localhost:5174',
+  'http://localhost:3001'
+])
+function applyAirtableProxyCors(req, res) {
+  const origin = req.headers.origin
+  if (origin && AIRTABLE_PROXY_ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+    res.setHeader('Vary', 'Origin')
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+}
+app.options('/api/airtable/records', (req, res) => {
+  applyAirtableProxyCors(req, res)
   res.status(204).end()
 })
 
@@ -602,5 +626,32 @@ app.post('/api/send-product', async (req, res) => {
     res.status(500).json({ success: false, error: `Unhandled server error: ${err.message}` })
   }
 })
+
+// /api/airtable/records
+// Thin Express wrappers around the shared Airtable proxy handler — identical
+// behavior to the Vercel function at api/airtable/records.js. Both read the
+// same env vars (AIRTABLE_TOKEN, with VITE_AIRTABLE_TOKEN fallback).
+function extractAirtableQuery(url) {
+  const qIndex = (url || '').indexOf('?')
+  return new URLSearchParams(qIndex >= 0 ? url.slice(qIndex + 1) : '')
+}
+async function airtableProxyRoute(req, res) {
+  applyAirtableProxyCors(req, res)
+  try {
+    const { status, body } = await handleAirtableProxy({
+      method: req.method,
+      query: extractAirtableQuery(req.url),
+      body: req.body
+    })
+    res.status(status).json(body)
+  } catch (err) {
+    console.error('airtable-proxy wrapper threw:', err)
+    res.status(500).json({ success: false, error: `Unhandled server error: ${err.message}` })
+  }
+}
+app.get('/api/airtable/records', airtableProxyRoute)
+app.post('/api/airtable/records', airtableProxyRoute)
+app.patch('/api/airtable/records', airtableProxyRoute)
+app.delete('/api/airtable/records', airtableProxyRoute)
 
 app.listen(3001, () => console.log('kāre API server running on port 3001'))
