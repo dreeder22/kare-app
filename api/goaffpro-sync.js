@@ -14,6 +14,10 @@ export default async function handler(req, res) {
     const affData = await affRes.json()
     const affiliates = affData.affiliates || []
 
+    // TEMP DEBUG: confirm GoAffPro response shape and auth
+    console.log(`[TEMP DEBUG] GoAffPro affiliates: status=${affRes.status}, count=${affiliates.length}`)
+    console.log(`[TEMP DEBUG] First 3 affiliates:`, JSON.stringify(affiliates.slice(0, 3).map(a => ({ name: a.name, email: a.email, status: a.status }))))
+
     // Step 2: Get all orders with pagination
     let allOrders = []
     let ordPage = 1
@@ -61,11 +65,26 @@ export default async function handler(req, res) {
       offset = creatorsData.offset || null
     } while (offset)
 
+    // TEMP DEBUG: confirm dedupe baseline
+    console.log(`[TEMP DEBUG] Existing Airtable Creators: count=${creators.length}`)
+
     const results = { updated: 0, created: 0, monthlyAdded: 0 }
     const creatorIdMap = {}
 
+    // TEMP DEBUG: per-loop counters
+    const debugStats = { iterated: 0, matched: 0, attemptedPosts: 0, successfulPosts: 0 }
+    let debugLogged = 0
+
     for (const affiliate of affiliates) {
       if (affiliate.status !== 'approved') continue
+
+      // TEMP DEBUG: log first 5 approved affiliates
+      debugStats.iterated++
+      const isDebug = debugLogged < 5
+      if (isDebug) {
+        debugLogged++
+        console.log(`[TEMP DEBUG] Affiliate #${debugStats.iterated}: email=${affiliate.email}, instagram=${affiliate.instagram}`)
+      }
 
       const allTime = allTimeStats[affiliate.id] || { totalSales: 0, totalCommissions: 0, totalOrders: 0, totalUnits: 0 }
 
@@ -86,30 +105,50 @@ export default async function handler(req, res) {
 
       let creatorRecordId
       if (existing) {
-        await fetch(`https://api.airtable.com/v0/${baseId}/Creators/${existing.id}`, {
+        // TEMP DEBUG: dedupe outcome
+        if (isDebug) console.log(`[TEMP DEBUG]   -> dedupe MATCH (record ${existing.id})`)
+        debugStats.matched++
+        const patchRes = await fetch(`https://api.airtable.com/v0/${baseId}/Creators/${existing.id}`, {
           method: 'PATCH',
           headers: { 'Authorization': `Bearer ${airtableToken}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ fields })
         })
+        // TEMP DEBUG: surface any 4xx/5xx from Airtable PATCH
+        if (!patchRes.ok) {
+          const body = await patchRes.text()
+          console.log(`[TEMP DEBUG]   PATCH ${patchRes.status} ERROR (${existing.id}): ${body}`)
+        }
         creatorRecordId = existing.id
         results.updated++
       } else {
+        // TEMP DEBUG: dedupe outcome + POST request body
+        if (isDebug) console.log(`[TEMP DEBUG]   -> dedupe MISS, will POST`)
+        debugStats.attemptedPosts++
+        const postBody = {
+          fields: {
+            ...fields,
+            'Handle': affiliate.instagram ? `@${affiliate.instagram}` : '',
+            'Full Name': affiliate.name,
+            'Email': affiliate.email,
+            'Status': 'Active',
+            'Tier': 'Rising',
+            'Date Joined': new Date().toISOString().split('T')[0]
+          }
+        }
+        if (isDebug) console.log(`[TEMP DEBUG]   POST body: ${JSON.stringify(postBody)}`)
         const createRes = await fetch(`https://api.airtable.com/v0/${baseId}/Creators`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${airtableToken}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fields: {
-              ...fields,
-              'Handle': affiliate.instagram ? `@${affiliate.instagram}` : '',
-              'Full Name': affiliate.name,
-              'Email': affiliate.email,
-              'Status': 'Active',
-              'Tier': 'Rising',
-              'Date Joined': new Date().toISOString().split('T')[0]
-            }
-          })
+          body: JSON.stringify(postBody)
         })
         const createJson = await createRes.json()
+        // TEMP DEBUG: log status; surface any 4xx/5xx response body
+        if (isDebug) console.log(`[TEMP DEBUG]   POST status: ${createRes.status}`)
+        if (!createRes.ok) {
+          console.log(`[TEMP DEBUG]   POST ${createRes.status} ERROR: ${JSON.stringify(createJson)}`)
+        } else {
+          debugStats.successfulPosts++
+        }
         creatorRecordId = createJson.id
         results.created++
       }
@@ -199,6 +238,9 @@ export default async function handler(req, res) {
         }
       }
     }
+
+    // TEMP DEBUG: end-of-run summary
+    console.log(`[TEMP DEBUG] Final: iterated=${debugStats.iterated}, matched=${debugStats.matched}, attemptedPosts=${debugStats.attemptedPosts}, successfulPosts=${debugStats.successfulPosts}`)
 
     res.json({ success: true, ...results })
   } catch (err) {
