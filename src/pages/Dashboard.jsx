@@ -86,6 +86,61 @@ export default function Dashboard() {
     : orders.filter(o => o.fields['Created At']?.startsWith(revenueYear))
   const allTimeRevenue = filteredOrders.reduce((s, o) => s + (o.fields['Total Price'] || 0), 0)
 
+  // --- subscription metrics ---
+  // Tags is a single comma-separated string per order; cadence varies per
+  // customer (monthly vs bi-monthly), so we normalize MRR by the gap between
+  // each subscriber's two most recent subscription orders.
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - 65)
+  const cutoffISO = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`
+
+  const subOrders = orders.filter(o => {
+    const tags = (o.fields.Tags || '').split(',').map(t => t.trim())
+    return tags.includes('Subscription')
+  })
+
+  const subsByEmail = new Map()
+  for (const o of subOrders) {
+    const email = (o.fields.Email || '').toLowerCase()
+    if (!email) continue
+    if (!subsByEmail.has(email)) subsByEmail.set(email, [])
+    subsByEmail.get(email).push(o)
+  }
+
+  const activeSubEmails = new Set()
+  for (const o of subOrders) {
+    if ((o.fields['Created At'] || '') < cutoffISO) continue
+    const email = (o.fields.Email || '').toLowerCase()
+    if (email) activeSubEmails.add(email)
+  }
+
+  let mrr = 0
+  for (const email of activeSubEmails) {
+    const list = (subsByEmail.get(email) || [])
+      .slice()
+      .sort((a, b) => (b.fields['Created At'] || '').localeCompare(a.fields['Created At'] || ''))
+    const mostRecent = list[0]
+    const price = mostRecent?.fields['Total Price']
+    if (price == null) continue
+    if (list.length === 1) { mrr += price; continue }
+    const gapDays = (new Date(mostRecent.fields['Created At']) - new Date(list[1].fields['Created At'])) / 86_400_000
+    mrr += (gapDays >= 35 && gapDays <= 70) ? price / 2 : price
+  }
+
+  const newSubEmails = new Set()
+  for (const o of subOrders) {
+    if (!o.fields['Created At']?.startsWith(monthPrefix)) continue
+    const tags = (o.fields.Tags || '').split(',').map(t => t.trim())
+    if (!tags.includes('Subscription First Order')) continue
+    const email = (o.fields.Email || '').toLowerCase()
+    if (email) newSubEmails.add(email)
+  }
+
+  const hasOrders = orders.length > 0
+  const activeSubsLabel = hasOrders ? String(activeSubEmails.size) : '—'
+  const mrrLabel = hasOrders ? `$${mrr.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
+  const newSubsLabel = hasOrders ? String(newSubEmails.size) : '—'
+
   // Loading gate only on the very first fetch. Refreshes don't blank the page.
   if (loading && !lastUpdatedAt) return <div className="p-8 text-gray-400">Loading...</div>
 
@@ -143,6 +198,20 @@ export default function Dashboard() {
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
           <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Avg CTR</p>
           <p className="text-2xl font-bold">{weightedCTR != null ? `${weightedCTR.toFixed(2)}%` : '—'}</p>
+        </div>
+
+        {/* --- Subscription row --- */}
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+          <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Active Subscribers</p>
+          <p className="text-2xl font-bold">{activeSubsLabel}</p>
+        </div>
+        <div className="col-span-2 bg-gray-900 border border-gray-800 rounded-xl p-5">
+          <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">MRR</p>
+          <p className="text-2xl font-bold">{mrrLabel}</p>
+        </div>
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+          <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">New This Month</p>
+          <p className="text-2xl font-bold">{newSubsLabel}</p>
         </div>
 
         {/* --- Historical row --- */}
