@@ -91,7 +91,7 @@ export default function Dashboard() {
   // customer (monthly vs bi-monthly), so we normalize MRR by the gap between
   // each subscriber's two most recent subscription orders.
   const cutoff = new Date()
-  cutoff.setDate(cutoff.getDate() - 65)
+  cutoff.setDate(cutoff.getDate() - 75)
   const cutoffISO = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`
 
   const subOrders = orders.filter(o => {
