@@ -29,6 +29,19 @@ export async function createRecord(table, fields) {
   return res.json()
 }
 
+// Batch create: array of field-objects, up to 100 per call (server chunks to Airtable's 10 limit)
+export async function createRecords(table, fieldsArray) {
+  const res = await fetch(PROXY_URL, {
+    ...CREDS,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ table, records: fieldsArray.map(fields => ({ fields })) })
+  })
+  if (!res.ok) throw new Error(await extractError(res))
+  const data = await res.json()
+  return data.records || []
+}
+
 export async function updateRecord(table, id, fields) {
   const url = `${PROXY_URL}?table=${encodeURIComponent(table)}&id=${encodeURIComponent(id)}`
   const res = await fetch(url, {

@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { getRecords, createRecord, updateRecord, deleteRecord } from '../lib/airtable'
+import { getRecords, createRecord, createRecords, updateRecord, deleteRecord } from '../lib/airtable'
+import CsvImport from '../components/CsvImport'
 import { buildAgreement } from '../../lib/agreement-template.js'
 
 const OUTREACH_STATUSES = ['Pending', 'Ready to Contact', 'DM Sent', 'Follow-up 1', 'Follow-up 2', 'Declined', 'Re-engage']
@@ -123,6 +124,7 @@ export default function Influencers() {
   const [sending, setSending] = useState(null)
   const [contractLink, setContractLink] = useState(null)
   const [findingLeads, setFindingLeads] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [leadSearch, setLeadSearch] = useState('')
   const [creatorSearch, setCreatorSearch] = useState('')
   const [sendingProduct, setSendingProduct] = useState(null)
@@ -633,6 +635,13 @@ export default function Influencers() {
               {findingLeads ? 'Finding Leads...' : 'Find Leads'}
             </button>
             <button
+              onClick={() => setShowImport(true)}
+              className="px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
+              style={{backgroundColor: '#2C2C2A', color: '#B8963E', border: '1px solid #B8963E'}}
+            >
+              Import CSV
+            </button>
+            <button
               onClick={() => setShowAddLead(true)}
               className="px-4 py-2 rounded-lg text-sm font-semibold text-black"
               style={{backgroundColor: '#B8963E'}}
@@ -693,6 +702,13 @@ export default function Influencers() {
           )
         })}
       </div>
+
+      {showImport && (
+        <CsvImport
+          onClose={() => setShowImport(false)}
+          onDone={(msg) => { alert(msg); fetchAll() }}
+        />
+      )}
 
       {showAddLead && (
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-6">
