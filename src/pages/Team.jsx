@@ -9,6 +9,9 @@ export default function Team() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [resetEmail, setResetEmail] = useState(null)
+  const [resetPw, setResetPw] = useState('')
+  const [resetting, setResetting] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -50,6 +53,33 @@ export default function Team() {
       setError('Could not create the login')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const doReset = async (e) => {
+    e.preventDefault()
+    setError('')
+    setNotice('')
+    setResetting(true)
+    try {
+      const res = await fetch('/api/auth?action=set-password', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail, password: resetPw })
+      })
+      const data = await res.json()
+      if (!data.success) {
+        setError(data.error || 'Could not reset the password')
+      } else {
+        setNotice(`Password reset for ${resetEmail} — share the new password with them directly.`)
+        setResetEmail(null)
+        setResetPw('')
+      }
+    } catch {
+      setError('Could not reset the password')
+    } finally {
+      setResetting(false)
     }
   }
 
@@ -119,13 +149,14 @@ export default function Team() {
               <th className="px-4 py-3 font-medium">Name</th>
               <th className="px-4 py-3 font-medium">Email</th>
               <th className="px-4 py-3 font-medium">Role</th>
+              <th className="px-4 py-3 font-medium"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={3} className="px-4 py-6 text-center text-gray-500">Loading…</td></tr>
+              <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-500">Loading…</td></tr>
             ) : users.length === 0 ? (
-              <tr><td colSpan={3} className="px-4 py-6 text-center text-gray-500">No logins yet.</td></tr>
+              <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-500">No logins yet.</td></tr>
             ) : (
               users.map(u => (
                 <tr key={u.id} className="border-b border-gray-800 last:border-0">
@@ -135,6 +166,44 @@ export default function Team() {
                     <span className={`text-xs px-2 py-1 rounded-full capitalize ${u.role === 'owner' ? 'bg-yellow-900/40 text-yellow-300' : 'bg-gray-800 text-gray-300'}`}>
                       {u.role}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {resetEmail === u.email ? (
+                      <form onSubmit={doReset} className="flex items-center justify-end gap-2">
+                        <input
+                          className={inputCls + ' !w-44'}
+                          placeholder="New password (min 8)"
+                          type="text"
+                          value={resetPw}
+                          onChange={e => setResetPw(e.target.value)}
+                          required
+                          minLength={8}
+                          autoFocus
+                        />
+                        <button
+                          type="submit"
+                          disabled={resetting}
+                          className="px-3 py-2 rounded-lg text-xs font-medium text-black disabled:opacity-50"
+                          style={{ backgroundColor: '#B8963E' }}
+                        >
+                          {resetting ? 'Setting…' : 'Set'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setResetEmail(null); setResetPw('') }}
+                          className="px-3 py-2 rounded-lg text-xs text-gray-400 hover:text-white"
+                        >
+                          Cancel
+                        </button>
+                      </form>
+                    ) : (
+                      <button
+                        onClick={() => { setResetEmail(u.email); setResetPw(''); setError(''); setNotice('') }}
+                        className="text-xs text-gray-400 hover:text-white underline underline-offset-2"
+                      >
+                        Reset password
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))

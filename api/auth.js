@@ -1,5 +1,5 @@
 import {
-  findUserByEmail, countUsers, createUser, listUsers,
+  findUserByEmail, countUsers, createUser, listUsers, updateUserPassword,
   hashPassword, verifyPassword, signSession, verifySession,
   getSessionCookie, setSessionCookie, clearSessionCookie, isSecureRequest,
   requireSession
@@ -13,6 +13,7 @@ import {
 //   POST /api/auth?action=login      -> { email, password[, name, setup] }
 //   POST /api/auth?action=logout
 //   POST /api/auth?action=create-user -> owner only { name, email, password, role }
+//   POST /api/auth?action=set-password -> owner only { email, password }
 
 async function handleSetup(req, res) {
   try {
@@ -130,6 +131,29 @@ async function handleCreateUser(req, res) {
   }
 }
 
+async function handleSetPassword(req, res) {
+  const session = requireSession(req, res, ['owner'])
+  if (!session) return
+  const { email, password } = req.body || {}
+  if (!email || !password) {
+    return res.status(400).json({ success: false, error: 'Email and new password are required' })
+  }
+  if (String(password).length < 8) {
+    return res.status(400).json({ success: false, error: 'Password must be at least 8 characters' })
+  }
+  try {
+    const user = await findUserByEmail(String(email).toLowerCase().trim())
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'No login found for that email' })
+    }
+    await updateUserPassword(user.id, hashPassword(String(password)))
+    return res.json({ success: true })
+  } catch (err) {
+    console.error('set password error:', err)
+    return res.status(500).json({ success: false, error: 'Could not reset the password' })
+  }
+}
+
 export default async function handler(req, res) {
   const url = new URL(req.url, 'http://x')
   const action = url.searchParams.get('action') || req.query?.action
@@ -140,5 +164,6 @@ export default async function handler(req, res) {
   if (req.method === 'POST' && action === 'login') return handleLogin(req, res)
   if (req.method === 'POST' && action === 'logout') return handleLogout(req, res)
   if (req.method === 'POST' && action === 'create-user') return handleCreateUser(req, res)
+  if (req.method === 'POST' && action === 'set-password') return handleSetPassword(req, res)
   return res.status(400).json({ success: false, error: 'Unknown auth action' })
 }

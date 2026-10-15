@@ -547,7 +547,7 @@ export default function Influencers() {
             console.error(`Failed to save lead ${lead.handle}:`, err.message)
           }
         }
-        alert(`Found ${data.count} new leads (${data.skipped} duplicates skipped). ${saved} saved.`)
+        alert(`Found ${data.count} verified leads (${data.skipped} duplicates skipped${data.rejected ? `, ${data.rejected} fake handles rejected` : ''}). ${saved} saved.`)
         fetchAll()
       }
     } catch (err) {

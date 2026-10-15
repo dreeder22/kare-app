@@ -97,11 +97,66 @@ Then return ONLY a JSON array starting with [ and ending with ]. No other text:
     }
 
     const allLeads = JSON.parse(jsonMatch[0])
-    const newLeads = allLeads.filter(lead =>
-      !existingHandles.has(lead.handle.toLowerCase())
+    const deduped = allLeads.filter(lead =>
+      lead.handle && !existingHandles.has(String(lead.handle).toLowerCase())
     )
+    const skippedDupes = allLeads.length - deduped.length
 
-    res.json({ leads: newLeads, count: newLeads.length, skipped: allLeads.length - newLeads.length })
+    // --- Instagram verification gate ---
+    // Claude invents plausible-sounding handles; only real, existing accounts
+    // get saved. A real profile page embeds "username":"<handle>" in its
+    // structured data; a nonexistent handle serves a 404 page
+    // (show_lox_redesigned_404_page) where the handle appears only in the URL.
+    const HANDLE_RE = /^[A-Za-z0-9._]{1,30}$/
+    const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36'
+
+    async function handleExists(rawHandle) {
+      const handle = String(rawHandle).replace(/^@/, '').trim()
+      if (!HANDLE_RE.test(handle)) return false
+      try {
+        const ctrl = new AbortController()
+        const timer = setTimeout(() => ctrl.abort(), 7000)
+        const resp = await fetch(`https://www.instagram.com/${handle}/`, {
+          headers: { 'User-Agent': UA, 'Accept-Language': 'en-US,en;q=0.9' },
+          signal: ctrl.signal
+        })
+        clearTimeout(timer)
+        if (!resp.ok) return false
+        const html = await resp.text()
+        const lower = html.toLowerCase()
+        const h = handle.toLowerCase()
+        // 404 marker OR missing structured username = not a real account
+        if (lower.includes('show_lox_redesigned_404_page')) return false
+        return lower.includes(`"username":"${h}"`)
+      } catch {
+        return false
+      }
+    }
+
+    async function verifyBatch(leads, concurrency = 8) {
+      const verified = []
+      for (let i = 0; i < leads.length; i += concurrency) {
+        const chunk = leads.slice(i, i + concurrency)
+        const results = await Promise.all(chunk.map(async (lead) => {
+          const clean = String(lead.handle).replace(/^@/, '').trim()
+          const ok = await handleExists(clean)
+          return ok ? { ...lead, handle: clean } : null
+        }))
+        for (const r of results) if (r) verified.push(r)
+      }
+      return verified
+    }
+
+    const newLeads = await verifyBatch(deduped)
+    const rejected = deduped.length - newLeads.length
+
+    res.json({
+      leads: newLeads,
+      count: newLeads.length,
+      skipped: skippedDupes,
+      rejected,
+      note: rejected > 0 ? `${rejected} AI-suggested handle(s) did not exist on Instagram and were dropped` : undefined
+    })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: err.message })
