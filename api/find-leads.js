@@ -76,6 +76,13 @@ Then return ONLY a JSON array starting with [ and ending with ]. No other text:
 
     const data = await response.json()
 
+    // Surface Anthropic API errors clearly (bad key, retired model, no credits, etc.)
+    if (!response.ok || data.type === 'error' || data.error) {
+      const msg = data?.error?.message || `Anthropic API returned HTTP ${response.status}`
+      console.error('Anthropic API error:', JSON.stringify(data).slice(0, 500))
+      return res.status(500).json({ error: `Lead search failed: ${msg}` })
+    }
+
     // Get the last text block from potentially multi-turn response
     const textBlocks = data.content?.filter(c => c.type === 'text') || []
     const lastText = textBlocks[textBlocks.length - 1]?.text
