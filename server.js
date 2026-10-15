@@ -2,6 +2,12 @@ import express from 'express'
 import cors from 'cors'
 import { handleSendProduct } from './lib/send-product-handler.js'
 import { handleAirtableProxy } from './lib/airtable-proxy-handler.js'
+import {
+  findUserByEmail, countUsers, createUser,
+  hashPassword, verifyPassword, signSession, verifySession,
+  getSessionCookie, setSessionCookie, clearSessionCookie,
+  isSecureRequest, tableAllowedForRole
+} from './lib/auth.js'
 
 const app = express()
 
@@ -637,6 +643,13 @@ function extractAirtableQuery(url) {
 }
 async function airtableProxyRoute(req, res) {
   applyAirtableProxyCors(req, res)
+  const session = verifySession(getSessionCookie(req))
+  if (!session) return res.status(401).json({ success: false, error: 'Not signed in' })
+  const q = extractAirtableQuery(req.url)
+  const table = (req.method === 'GET' || req.method === 'DELETE') ? q.get('table') : (req.body && req.body.table)
+  if (table && !tableAllowedForRole(table, session.role)) {
+    return res.status(403).json({ success: false, error: 'Not permitted for your role' })
+  }
   try {
     const { status, body } = await handleAirtableProxy({
       method: req.method,
@@ -653,5 +666,98 @@ app.get('/api/airtable/records', airtableProxyRoute)
 app.post('/api/airtable/records', airtableProxyRoute)
 app.patch('/api/airtable/records', airtableProxyRoute)
 app.delete('/api/airtable/records', airtableProxyRoute)
+
+// ---- Auth (mirrors api/auth/* Vercel functions) ----
+function expressSecure(req) {
+  return req.headers['x-forwarded-proto'] === 'https' || process.env.NODE_ENV === 'production'
+}
+
+app.get('/api/auth/setup', async (req, res) => {
+  try {
+    const n = await countUsers()
+    res.json({ success: true, needed: n === 0 })
+  } catch (e) {
+    if (/TABLE_NOT_FOUND|NOT_FOUND/i.test(e.message)) return res.json({ success: true, needed: true, missingTable: true })
+    res.status(500).json({ success: false, error: 'Could not check setup status' })
+  }
+})
+
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password, name, setup } = req.body || {}
+  if (!email || !password) return res.status(400).json({ success: false, error: 'Email and password are required' })
+  try {
+    let userCount = 0
+    try { userCount = await countUsers() }
+    catch (e) { if (!/TABLE_NOT_FOUND|NOT_FOUND/i.test(e.message)) throw e }
+    if (userCount === 0) {
+      if (!setup || !name) return res.status(403).json({ success: false, error: 'No users exist yet', setupNeeded: true })
+      if (String(password).length < 8) return res.status(400).json({ success: false, error: 'Password must be at least 8 characters' })
+      const created = await createUser({ name: String(name).slice(0, 100), email: String(email).toLowerCase().trim(), passwordHash: hashPassword(String(password)), role: 'owner' })
+      setSessionCookie(res, signSession({ uid: created.id, email: String(email).toLowerCase().trim(), name: String(name).slice(0, 100), role: 'owner' }), { secure: expressSecure(req) })
+      return res.json({ success: true, user: { email: String(email).toLowerCase().trim(), name: String(name).slice(0, 100), role: 'owner' } })
+    }
+    const user = await findUserByEmail(email)
+    if (!user || !verifyPassword(String(password), user.passwordHash)) {
+      return res.status(401).json({ success: false, error: 'Invalid email or password' })
+    }
+    setSessionCookie(res, signSession({ uid: user.id, email: user.email, name: user.name, role: user.role }), { secure: expressSecure(req) })
+    res.json({ success: true, user: { email: user.email, name: user.name, role: user.role } })
+  } catch (err) {
+    console.error('login error:', err)
+    res.status(500).json({ success: false, error: 'Login failed' })
+  }
+})
+
+app.post('/api/auth/logout', (req, res) => {
+  clearSessionCookie(res, { secure: expressSecure(req) })
+  res.json({ success: true })
+})
+
+app.get('/api/auth/me', (req, res) => {
+  const session = verifySession(getSessionCookie(req))
+  if (!session) return res.status(401).json({ success: false, error: 'Not signed in' })
+  res.json({ success: true, user: { email: session.email, name: session.name, role: session.role } })
+})
+
+// Public e-sign parity route (delegates to the same logic as api/sign.js)
+app.get('/api/sign', async (req, res) => {
+  try {
+    const { airtableFetch } = await import('./lib/auth.js')
+    const campaignId = req.query.campaign
+    if (!campaignId) return res.status(400).json({ success: false, error: 'Missing campaign id' })
+    const rec = await airtableFetch(`/Creator%20Campaigns/${campaignId}`)
+    const f = rec.fields || {}
+    res.json({ success: true, campaignName: f['Campaign Name'] || '', contractStatus: f['Contract Status'] || 'Draft', agreementText: f['Agreement Text'] || '', signedAt: f['Contract Signed At'] || null })
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Something went wrong' })
+  }
+})
+app.post('/api/sign', async (req, res) => {
+  try {
+    const { airtableFetch } = await import('./lib/auth.js')
+    const { AGREEMENT_VERSION } = await import('./lib/agreement-template.js')
+    const campaignId = req.query.campaign
+    const { signatureName } = req.body || {}
+    if (!campaignId) return res.status(400).json({ success: false, error: 'Missing campaign id' })
+    if (!signatureName || String(signatureName).trim().length < 2) return res.status(400).json({ success: false, error: 'Please type your full name to sign' })
+    const rec = await airtableFetch(`/Creator%20Campaigns/${campaignId}`)
+    if (rec.fields?.['Contract Status'] === 'Signed') return res.status(409).json({ success: false, error: 'Already signed' })
+    const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || 'unknown'
+    const signedAt = new Date().toISOString().split('T')[0]
+    const name = String(signatureName).trim().slice(0, 120)
+    await airtableFetch(`/Creator%20Campaigns/${campaignId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ fields: {
+        'Contract Status': 'Signed', 'Contract Signed At': signedAt,
+        'Signature Name': name, 'Signature IP': ip,
+        'Agreement Text': (rec.fields?.['Agreement Text'] || '') + `\n\n--- SIGNED ---\nSigned by: ${name}\nDate: ${signedAt}\nIP: ${ip}\nAgreement version: ${AGREEMENT_VERSION}`
+      }})
+    })
+    res.json({ success: true, signedAt })
+  } catch (err) {
+    console.error('sign error:', err)
+    res.status(500).json({ success: false, error: 'Something went wrong' })
+  }
+})
 
 app.listen(3001, () => console.log('kāre API server running on port 3001'))

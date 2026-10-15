@@ -1,4 +1,5 @@
 import { handleSendProduct } from '../lib/send-product-handler.js'
+import { requireSession } from '../lib/auth.js'
 
 // POST /api/send-product
 //
@@ -30,6 +31,8 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     return res.status(204).end()
   }
+
+  if (!requireSession(req, res, ['owner'])) return
 
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST, OPTIONS')

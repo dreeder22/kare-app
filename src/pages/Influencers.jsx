@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { getRecords, createRecord, updateRecord, deleteRecord } from '../lib/airtable'
+import { buildAgreement } from '../../lib/agreement-template.js'
 
 const OUTREACH_STATUSES = ['Pending', 'Ready to Contact', 'DM Sent', 'Follow-up 1', 'Follow-up 2', 'Declined', 'Re-engage']
 
@@ -120,6 +121,7 @@ export default function Influencers() {
   const [syncMonth, setSyncMonth] = useState(new Date().getMonth() + 1)
   const [syncYear, setSyncYear] = useState(new Date().getFullYear())
   const [sending, setSending] = useState(null)
+  const [contractLink, setContractLink] = useState(null)
   const [findingLeads, setFindingLeads] = useState(false)
   const [leadSearch, setLeadSearch] = useState('')
   const [creatorSearch, setCreatorSearch] = useState('')
@@ -170,6 +172,40 @@ export default function Influencers() {
     }
   }
 
+  // Built-in e-sign: generate the agreement, mark it sent, and surface the
+  // private signing link to copy to the creator. No PandaDoc/DocuSign needed.
+  async function sendContract(camp) {
+    const creatorId = camp.fields['Linked Creator']?.[0]
+    const creator = creators.find(c => c.id === creatorId)
+    if (!creator) return alert('No linked creator found for this campaign')
+
+    const creatorName = creator.fields['Full Name'] || creator.fields['Handle'] || ''
+    const creatorHandle = creator.fields['Handle'] || ''
+    const discountCode = creator.fields['Discount Code'] || ''
+    const referralLink = creator.fields['Referral Link'] || ''
+
+    const agreementText = buildAgreement({
+      creatorName, creatorHandle, discountCode, referralLink,
+      effectiveDate: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    })
+
+    setSending(camp.id)
+    try {
+      await updateRecord('Creator Campaigns', camp.id, {
+        'Contract Status': 'Sent',
+        'Contract Sent At': new Date().toISOString().split('T')[0],
+        'Agreement Text': agreementText,
+        'Pipeline Stage': 'Contract Sent'
+      })
+      setContractLink(`${window.location.origin}/sign/${camp.id}`)
+      fetchAll()
+    } catch (err) {
+      alert(`Failed to send contract: ${err.message}`)
+    } finally {
+      setSending(null)
+    }
+  }
+
   async function sendBriefAndContract(camp) {
     const creatorId = camp.fields['Linked Creator']?.[0]
     const creator = creators.find(c => c.id === creatorId)
@@ -183,6 +219,7 @@ export default function Influencers() {
     try {
       const res = await fetch('/api/send-brief', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           creatorName,
@@ -262,6 +299,7 @@ export default function Influencers() {
     try {
       const response = await fetch('/api/generate-dm', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           lead: {
@@ -420,6 +458,7 @@ export default function Influencers() {
 
       const res = await fetch('/api/send-product', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       })
@@ -478,8 +517,9 @@ export default function Influencers() {
   async function findLeads() {
     setFindingLeads(true)
     try {
-      const res = await fetch('https://kare-app-production.up.railway.app/api/find-leads', {
+      const res = await fetch('/api/find-leads', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({})
       })
@@ -524,8 +564,9 @@ export default function Influencers() {
     if (cleanHandle !== handle) setNewLead(prev => ({...prev, handle: cleanHandle}))
     setLookingUp(true)
     try {
-      const res = await fetch('https://kare-app-production.up.railway.app/api/lookup-handle', {
+      const res = await fetch('/api/lookup-handle', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ handle })
       })
@@ -551,6 +592,7 @@ export default function Influencers() {
     try {
       const res = await fetch('/api/goaffpro-sync', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({})
       })
@@ -791,15 +833,26 @@ export default function Influencers() {
                   </td>
                   <td className="px-4 py-3 font-medium">
                     {lead.fields['Handle'] ? (
-                      <a
-                        href={`https://www.instagram.com/${lead.fields['Handle'].replace('@', '')}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:underline"
-                        style={{color: '#B8963E'}}
-                      >
-                        {lead.fields['Handle']}
-                      </a>
+                      <span className="inline-flex items-center gap-2">
+                        <a
+                          href={`https://www.instagram.com/${lead.fields['Handle'].replace('@', '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:underline"
+                          style={{color: '#B8963E'}}
+                        >
+                          {lead.fields['Handle']}
+                        </a>
+                        <a
+                          href={`https://ig.me/m/${lead.fields['Handle'].replace('@', '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Open DM thread"
+                          className="text-[11px] px-2 py-0.5 rounded-full bg-gray-800 text-gray-300 hover:text-white hover:bg-gray-700 transition-colors"
+                        >
+                          DM
+                        </a>
+                      </span>
                     ) : '—'}
                   </td>
                   <td className="px-4 py-3 text-gray-400">{lead.fields['Full Name'] || '—'}</td>
@@ -1274,12 +1327,21 @@ export default function Influencers() {
                         className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-yellow-600"
                       >
                         <option>Needs Brief</option>
+                        <option>Agreed</option>
+                        <option>Contract Sent</option>
+                        <option>Contract Signed</option>
+                        <option>Brief Sent</option>
                         <option>Brief/Contract Sent</option>
                         <option>Brief/Contract Received</option>
+                        <option>GoAffPro Link Sent</option>
                         <option>Leadsie Sent</option>
+                        <option>Product Sent</option>
                         <option>Waiting for Content</option>
+                        <option>Video Received</option>
                         <option>Content Received</option>
+                        <option>Meta Account Linked</option>
                         <option>Ad Running</option>
+                        <option>Ad Posted</option>
                         <option>Completed</option>
                       </select>
                     </td>
@@ -1287,16 +1349,36 @@ export default function Influencers() {
                     <td className="px-4 py-3">${(camp.fields['Revenue Generated'] || 0).toFixed(2)}</td>
                     <td className="px-4 py-3 text-gray-400">{camp.fields['Rating'] || '—'}</td>
                     <td className="px-4 py-3">
-                      {camp.fields['Pipeline Stage'] === 'Needs Brief' && (
-                        <button
-                          onClick={() => sendBriefAndContract(camp)}
-                          disabled={sending === camp.id}
-                          className="px-3 py-1 rounded text-xs font-semibold text-black disabled:opacity-50 whitespace-nowrap"
-                          style={{backgroundColor: '#B8963E'}}
-                        >
-                          {sending === camp.id ? 'Sending...' : 'Send Brief & Contract'}
-                        </button>
-                      )}
+                      <div className="flex flex-col gap-1 items-start">
+                        {camp.fields['Contract Status'] === 'Signed' ? (
+                          <span className="text-xs text-green-400">✓ Signed {camp.fields['Contract Signed At'] || ''}</span>
+                        ) : camp.fields['Contract Status'] === 'Sent' ? (
+                          <button
+                            onClick={() => setContractLink(`${window.location.origin}/sign/${camp.id}`)}
+                            className="text-xs text-yellow-500 hover:text-yellow-400 underline"
+                          >
+                            Contract sent — copy signing link
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => sendContract(camp)}
+                            disabled={sending === camp.id}
+                            className="px-3 py-1 rounded text-xs font-semibold text-black disabled:opacity-50 whitespace-nowrap"
+                            style={{backgroundColor: '#B8963E'}}
+                          >
+                            {sending === camp.id ? 'Sending...' : 'Send Contract'}
+                          </button>
+                        )}
+                        {camp.fields['Pipeline Stage'] === 'Needs Brief' && (
+                          <button
+                            onClick={() => sendBriefAndContract(camp)}
+                            disabled={sending === camp.id}
+                            className="text-xs text-gray-400 hover:text-white underline disabled:opacity-50"
+                          >
+                            {sending === camp.id ? 'Sending...' : 'Send brief (PandaDoc)'}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )
@@ -1304,6 +1386,39 @@ export default function Influencers() {
             </tbody>
           </table>
           {campaigns.length === 0 && <div className="p-8 text-center text-gray-500">No creator campaigns yet.</div>}
+        </div>
+      )}
+
+      {/* Signing-link modal after Send Contract */}
+      {contractLink && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4" onClick={() => setContractLink(null)}>
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <h3 className="text-base font-semibold mb-2">Contract sent</h3>
+            <p className="text-xs text-gray-400 mb-3">
+              Send this private link to the creator — they'll read and sign the
+              agreement right in the browser. No account needed.
+            </p>
+            <div className="flex gap-2">
+              <input
+                readOnly value={contractLink}
+                className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-300"
+                onFocus={e => e.target.select()}
+              />
+              <button
+                onClick={() => { navigator.clipboard.writeText(contractLink); alert('Link copied') }}
+                className="px-3 py-2 rounded-lg text-xs font-semibold text-black whitespace-nowrap"
+                style={{backgroundColor: '#B8963E'}}
+              >
+                Copy
+              </button>
+            </div>
+            <button
+              onClick={() => setContractLink(null)}
+              className="mt-4 text-xs text-gray-400 hover:text-white"
+            >
+              Done
+            </button>
+          </div>
         </div>
       )}
 

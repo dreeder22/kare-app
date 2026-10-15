@@ -3,13 +3,16 @@
 //
 // Relative /api/* paths resolve to the same origin in production and to the
 // Express dev server via the Vite proxy in vite.config.js during local dev.
+//
+// Every request carries credentials: 'include' so the session cookie is sent.
 
 const PROXY_URL = '/api/airtable/records'
+const CREDS = { credentials: 'include' }
 
 export async function getRecords(table, params = '') {
   const extra = params.startsWith('?') ? params.slice(1) : params
   const qs = `table=${encodeURIComponent(table)}${extra ? `&${extra}` : ''}`
-  const res = await fetch(`${PROXY_URL}?${qs}`)
+  const res = await fetch(`${PROXY_URL}?${qs}`, CREDS)
   if (!res.ok) throw new Error(await extractError(res))
   const data = await res.json()
   return data.records || []
@@ -17,6 +20,7 @@ export async function getRecords(table, params = '') {
 
 export async function createRecord(table, fields) {
   const res = await fetch(PROXY_URL, {
+    ...CREDS,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ table, fields })
@@ -28,6 +32,7 @@ export async function createRecord(table, fields) {
 export async function updateRecord(table, id, fields) {
   const url = `${PROXY_URL}?table=${encodeURIComponent(table)}&id=${encodeURIComponent(id)}`
   const res = await fetch(url, {
+    ...CREDS,
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ fields })
@@ -38,7 +43,7 @@ export async function updateRecord(table, id, fields) {
 
 export async function deleteRecord(table, id) {
   const url = `${PROXY_URL}?table=${encodeURIComponent(table)}&id=${encodeURIComponent(id)}`
-  const res = await fetch(url, { method: 'DELETE' })
+  const res = await fetch(url, { ...CREDS, method: 'DELETE' })
   if (!res.ok) throw new Error(await extractError(res))
   return res.json()
 }

@@ -1,4 +1,5 @@
 import { handleAirtableProxy } from '../../lib/airtable-proxy-handler.js'
+import { getSessionCookie, verifySession, tableAllowedForRole } from '../../lib/auth.js'
 
 // /api/airtable/records
 //
@@ -36,9 +37,23 @@ export default async function handler(req, res) {
     return res.status(405).json({ success: false, error: 'Method not allowed' })
   }
 
+  // --- auth: every caller needs a valid session; outreach role is
+  // restricted to the creator-pipeline tables (no orders/ad stats/revenue).
+  const session = verifySession(getSessionCookie(req))
+  if (!session) {
+    return res.status(401).json({ success: false, error: 'Not signed in' })
+  }
+
   // Parse query from raw URL so Airtable's bracket syntax (sort[0][field]=X)
   // survives intact — framework query parsers otherwise turn it into nested objects.
   const query = extractQuery(req.url)
+
+  const table = req.method === 'GET' || req.method === 'DELETE'
+    ? query.get('table')
+    : (req.body && req.body.table)
+  if (table && !tableAllowedForRole(table, session.role)) {
+    return res.status(403).json({ success: false, error: 'Not permitted for your role' })
+  }
 
   try {
     const { status, body } = await handleAirtableProxy({
