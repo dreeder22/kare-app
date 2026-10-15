@@ -1,15 +1,18 @@
 import {
-  findUserByEmail, countUsers, createUser,
+  findUserByEmail, countUsers, createUser, listUsers,
   hashPassword, verifyPassword, signSession, verifySession,
-  getSessionCookie, setSessionCookie, clearSessionCookie, isSecureRequest
+  getSessionCookie, setSessionCookie, clearSessionCookie, isSecureRequest,
+  requireSession
 } from '../lib/auth.js'
 
 // Single auth function (keeps Vercel's serverless-function count under the
 // Hobby plan limit). Routes by ?action=:
-//   GET  /api/auth?action=setup -> { needed }
-//   GET  /api/auth?action=me    -> { user } or 401
-//   POST /api/auth?action=login -> { email, password[, name, setup] }
+//   GET  /api/auth?action=setup      -> { needed }
+//   GET  /api/auth?action=me         -> { user } or 401
+//   GET  /api/auth?action=users      -> owner only, list users
+//   POST /api/auth?action=login      -> { email, password[, name, setup] }
 //   POST /api/auth?action=logout
+//   POST /api/auth?action=create-user -> owner only { name, email, password, role }
 
 async function handleSetup(req, res) {
   try {
@@ -83,13 +86,59 @@ function handleLogout(req, res) {
   return res.json({ success: true })
 }
 
+async function handleListUsers(req, res) {
+  const session = requireSession(req, res, ['owner'])
+  if (!session) return
+  try {
+    const users = await listUsers()
+    return res.json({ success: true, users })
+  } catch (err) {
+    console.error('list users error:', err)
+    return res.status(500).json({ success: false, error: 'Could not load users' })
+  }
+}
+
+async function handleCreateUser(req, res) {
+  const session = requireSession(req, res, ['owner'])
+  if (!session) return
+  const { name, email, password, role } = req.body || {}
+  if (!name || !email || !password) {
+    return res.status(400).json({ success: false, error: 'Name, email and password are required' })
+  }
+  if (role !== 'owner' && role !== 'outreach') {
+    return res.status(400).json({ success: false, error: 'Role must be owner or outreach' })
+  }
+  if (String(password).length < 8) {
+    return res.status(400).json({ success: false, error: 'Password must be at least 8 characters' })
+  }
+  const cleanEmail = String(email).toLowerCase().trim()
+  try {
+    const existing = await findUserByEmail(cleanEmail)
+    if (existing) {
+      return res.status(409).json({ success: false, error: 'That email already has a login' })
+    }
+    await createUser({
+      name: String(name).slice(0, 100),
+      email: cleanEmail,
+      passwordHash: hashPassword(String(password)),
+      role
+    })
+    return res.json({ success: true })
+  } catch (err) {
+    console.error('create user error:', err)
+    return res.status(500).json({ success: false, error: 'Could not create the login' })
+  }
+}
+
 export default async function handler(req, res) {
   const url = new URL(req.url, 'http://x')
   const action = url.searchParams.get('action') || req.query?.action
 
   if (req.method === 'GET' && action === 'setup') return handleSetup(req, res)
   if (req.method === 'GET' && action === 'me') return handleMe(req, res)
+  if (req.method === 'GET' && action === 'users') return handleListUsers(req, res)
   if (req.method === 'POST' && action === 'login') return handleLogin(req, res)
   if (req.method === 'POST' && action === 'logout') return handleLogout(req, res)
+  if (req.method === 'POST' && action === 'create-user') return handleCreateUser(req, res)
   return res.status(400).json({ success: false, error: 'Unknown auth action' })
 }

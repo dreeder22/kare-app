@@ -667,57 +667,9 @@ app.post('/api/airtable/records', airtableProxyRoute)
 app.patch('/api/airtable/records', airtableProxyRoute)
 app.delete('/api/airtable/records', airtableProxyRoute)
 
-// ---- Auth (mirrors api/auth/* Vercel functions) ----
-function expressSecure(req) {
-  return req.headers['x-forwarded-proto'] === 'https' || process.env.NODE_ENV === 'production'
-}
-
-app.get('/api/auth/setup', async (req, res) => {
-  try {
-    const n = await countUsers()
-    res.json({ success: true, needed: n === 0 })
-  } catch (e) {
-    if (/TABLE_NOT_FOUND|NOT_FOUND/i.test(e.message)) return res.json({ success: true, needed: true, missingTable: true })
-    res.status(500).json({ success: false, error: 'Could not check setup status' })
-  }
-})
-
-app.post('/api/auth/login', async (req, res) => {
-  const { email, password, name, setup } = req.body || {}
-  if (!email || !password) return res.status(400).json({ success: false, error: 'Email and password are required' })
-  try {
-    let userCount = 0
-    try { userCount = await countUsers() }
-    catch (e) { if (!/TABLE_NOT_FOUND|NOT_FOUND/i.test(e.message)) throw e }
-    if (userCount === 0) {
-      if (!setup || !name) return res.status(403).json({ success: false, error: 'No users exist yet', setupNeeded: true })
-      if (String(password).length < 8) return res.status(400).json({ success: false, error: 'Password must be at least 8 characters' })
-      const created = await createUser({ name: String(name).slice(0, 100), email: String(email).toLowerCase().trim(), passwordHash: hashPassword(String(password)), role: 'owner' })
-      setSessionCookie(res, signSession({ uid: created.id, email: String(email).toLowerCase().trim(), name: String(name).slice(0, 100), role: 'owner' }), { secure: expressSecure(req) })
-      return res.json({ success: true, user: { email: String(email).toLowerCase().trim(), name: String(name).slice(0, 100), role: 'owner' } })
-    }
-    const user = await findUserByEmail(email)
-    if (!user || !verifyPassword(String(password), user.passwordHash)) {
-      return res.status(401).json({ success: false, error: 'Invalid email or password' })
-    }
-    setSessionCookie(res, signSession({ uid: user.id, email: user.email, name: user.name, role: user.role }), { secure: expressSecure(req) })
-    res.json({ success: true, user: { email: user.email, name: user.name, role: user.role } })
-  } catch (err) {
-    console.error('login error:', err)
-    res.status(500).json({ success: false, error: 'Login failed' })
-  }
-})
-
-app.post('/api/auth/logout', (req, res) => {
-  clearSessionCookie(res, { secure: expressSecure(req) })
-  res.json({ success: true })
-})
-
-app.get('/api/auth/me', (req, res) => {
-  const session = verifySession(getSessionCookie(req))
-  if (!session) return res.status(401).json({ success: false, error: 'Not signed in' })
-  res.json({ success: true, user: { email: session.email, name: session.name, role: session.role } })
-})
+// ---- Auth (delegates to api/auth.js so Express and Vercel share one implementation) ----
+import authHandler from './api/auth.js'
+app.all('/api/auth', (req, res) => authHandler(req, res))
 
 // Public e-sign parity route (delegates to the same logic as api/sign.js)
 app.get('/api/sign', async (req, res) => {

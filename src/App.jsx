@@ -7,6 +7,7 @@ import Launcher from './pages/Launcher'
 import Influencers from './pages/Influencers'
 import Login from './pages/Login'
 import Sign from './pages/Sign'
+import Team from './pages/Team'
 
 // Pages the outreach role may open. Everything else needs the owner role.
 const OUTREACH_ROUTES = new Set(['/influencers'])
@@ -51,6 +52,7 @@ function AppRoutes() {
         <Route path="ads" element={<RequireAuth ownerOnly><Ads /></RequireAuth>} />
         <Route path="launcher" element={<RequireAuth ownerOnly><Launcher /></RequireAuth>} />
         <Route path="influencers" element={<Influencers />} />
+        <Route path="team" element={<RequireAuth ownerOnly><Team /></RequireAuth>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -5,7 +5,8 @@ const NAV = [
   { to: '/', label: 'Dashboard', ownerOnly: true },
   { to: '/ads', label: 'Ad Performance', ownerOnly: true },
   { to: '/launcher', label: 'Campaign Launcher', ownerOnly: true },
-  { to: '/influencers', label: 'Influencers', ownerOnly: false }
+  { to: '/influencers', label: 'Influencers', ownerOnly: false },
+  { to: '/team', label: 'Team', ownerOnly: true }
 ]
 
 export default function Layout() {
