@@ -10,7 +10,7 @@ export function AuthProvider({ children }) {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch('/api/auth/me', { credentials: 'include' })
+      const res = await fetch('/api/auth?action=me', { credentials: 'include' })
       if (res.ok) {
         const data = await res.json()
         setUser(data.user)
@@ -20,7 +20,7 @@ export function AuthProvider({ children }) {
       setUser(null)
       // Check whether this is a first run (no users exist yet).
       try {
-        const s = await fetch('/api/auth/setup', { credentials: 'include' })
+        const s = await fetch('/api/auth?action=setup', { credentials: 'include' })
         if (s.ok) {
           const sd = await s.json()
           setSetupNeeded(!!sd.needed)
@@ -38,7 +38,7 @@ export function AuthProvider({ children }) {
   useEffect(() => { refresh() }, [refresh])
 
   const login = useCallback(async ({ email, password, name, setup }) => {
-    const res = await fetch('/api/auth/login', {
+    const res = await fetch('/api/auth?action=login', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -53,7 +53,7 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+      await fetch('/api/auth?action=logout', { method: 'POST', credentials: 'include' })
     } catch { /* ignore */ }
     setUser(null)
   }, [])
