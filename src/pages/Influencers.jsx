@@ -551,7 +551,7 @@ export default function Influencers() {
         fetchAll()
       }
     } catch (err) {
-      alert('Could not connect to local server. Make sure npm run dev:all is running.')
+      alert('The search took too long or the server is unreachable. Please try again.')
     } finally {
       setFindingLeads(false)
     }

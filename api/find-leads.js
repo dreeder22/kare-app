@@ -61,15 +61,15 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-5',
-        max_tokens: 8000,
+        max_tokens: 6000,
         tools: [{ type: 'web_search_20250305', name: 'web_search' }],
         tool_choice: { type: 'auto' },
         messages: [{
           role: 'user',
-          content: `Search the web for "${randomNiche}" and find 35 real Instagram accounts. Look for their actual Instagram handles, follower counts, and bios.
+          content: `Search the web for "${randomNiche}" and find 20 real Instagram accounts. Look for their actual Instagram handles, follower counts, and bios.
 
 Then return ONLY a JSON array starting with [ and ending with ]. No other text:
-[{"handle":"@realusername","fullName":"Real Name","bio":"bio text","followers":25000,"platform":"Instagram","location":"City, State","nicheTags":["wellness"]}]`
+[{"handle":"realusername","fullName":"Real Name","bio":"bio text","followers":25000,"platform":"Instagram","location":"City, State","nicheTags":["wellness"]}]`
         }]
       })
     })
@@ -122,7 +122,7 @@ Then return ONLY a JSON array starting with [ and ending with ]. No other text:
       if (!HANDLE_RE.test(handle)) return false
       try {
         const ctrl = new AbortController()
-        const timer = setTimeout(() => ctrl.abort(), 7000)
+        const timer = setTimeout(() => ctrl.abort(), 5000)
         const resp = await fetch(`https://www.instagram.com/${handle}/`, {
           headers: { 'User-Agent': UA, 'Accept-Language': 'en-US,en;q=0.9' },
           signal: ctrl.signal
@@ -140,7 +140,7 @@ Then return ONLY a JSON array starting with [ and ending with ]. No other text:
       }
     }
 
-    async function verifyBatch(leads, concurrency = 8) {
+    async function verifyBatch(leads, concurrency = 12) {
       const verified = []
       for (let i = 0; i < leads.length; i += concurrency) {
         const chunk = leads.slice(i, i + concurrency)
