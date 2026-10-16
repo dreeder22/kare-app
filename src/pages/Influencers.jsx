@@ -3,7 +3,7 @@ import { getRecords, createRecord, createRecords, updateRecord, deleteRecord } f
 import CsvImport from '../components/CsvImport'
 import { buildAgreement } from '../../lib/agreement-template.js'
 
-const OUTREACH_STATUSES = ['Pending', 'Ready to Contact', 'DM Sent', 'Follow-up 1', 'Follow-up 2', 'Declined', 'Re-engage']
+const OUTREACH_STATUSES = ['Ready to Contact', 'DM Sent', 'Follow-up 1', 'Follow-up 2', 'Declined', 'Re-engage']
 
 // Tab keys (internal) → user-facing labels.
 const TAB_LABELS = {
@@ -20,7 +20,7 @@ const TAB_LABELS = {
 // Future edits: keep terminal/dead-end statuses ≥ 90 and active pipeline ≤ 9
 // so the unknown bucket at 50 stays a clear safe-fail visual signal.
 const STATUS_SORT_GROUP = {
-  'Pending': 0,
+  'Ready to Contact': 0,
   'Ready to Contact': 1,
   'DM Sent': 2,
   'Follow-up 1': 3,
@@ -31,7 +31,7 @@ const STATUS_SORT_GROUP = {
 
 // Statuses visible on the Leads tab (Sample Sent and unknowns are excluded).
 const LEADS_TAB_STATUSES = new Set([
-  'Pending', 'Ready to Contact', 'DM Sent', 'Follow-up 1', 'Follow-up 2', 'Re-engage', 'Declined'
+  'Ready to Contact', 'DM Sent', 'Follow-up 1', 'Follow-up 2', 'Re-engage', 'Declined'
 ])
 
 // Status → sent-date field on Leads. Used both for stamping on advancement
@@ -270,7 +270,7 @@ export default function Influencers() {
       'Followers': parseInt(newLead.followers) || 0,
       'Platform': newLead.platform,
       'Location': newLead.location,
-      'Outreach Status': 'Pending',
+      'Outreach Status': 'Ready to Contact',
       'How Discovered': 'Manual',
       'Date Added': new Date().toISOString().split('T')[0]
     })
@@ -292,9 +292,25 @@ export default function Influencers() {
     const location = lead.fields['Location'] || ''
     const nicheTags = lead.fields['Niche Tags'] || []
 
-    const brandSettingsRecords = await getRecords('Brand Settings')
-    const brandSettings = {}
-    brandSettingsRecords.forEach(r => { brandSettings[r.fields['Setting Name']] = r.fields['Value'] })
+    // Brand voice: read from the Brand Settings table when it exists,
+    // otherwise fall back to built-in defaults so generation never breaks.
+    let brandSettings = {
+      'Brand Name': 'kāre',
+      'Tone': 'warm, confident, witty, quiet confidence',
+      'Products': 'Premium grass-fed New Zealand colostrum',
+      'Primary Audience': 'health-conscious adults',
+      'Ideal Creators': 'wellness, gut health, longevity and biohacking creators',
+      'Commission Rate': '10%'
+    }
+    try {
+      const brandSettingsRecords = await getRecords('Brand Settings')
+      if (brandSettingsRecords.length > 0) {
+        brandSettings = {}
+        brandSettingsRecords.forEach(r => { brandSettings[r.fields['Setting Name']] = r.fields['Value'] })
+      }
+    } catch {
+      // table missing — stick with defaults
+    }
 
     setGenerating(lead.id)
 
@@ -540,7 +556,7 @@ export default function Influencers() {
               'Followers': lead.followers,
               'Platform': lead.platform || 'Instagram',
               'Location': lead.location,
-              'Outreach Status': 'Pending',
+              'Outreach Status': 'Ready to Contact',
               'How Discovered': 'AI Daily',
               'Date Added': new Date().toISOString().split('T')[0]
             })
@@ -876,7 +892,7 @@ export default function Influencers() {
                   <td className="px-4 py-3 text-gray-400">{lead.fields['Platform'] || '—'}</td>
                   <td className="px-4 py-3">
                       <div className="flex flex-col gap-1">
-                        <span className="text-gray-400 text-xs">{lead.fields['Outreach Status'] || 'Pending'}</span>
+                        <span className="text-gray-400 text-xs">{lead.fields['Outreach Status'] || 'Ready to Contact'}</span>
                         {followUpBadge && (
                           <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-600 text-black w-fit">
                             {followUpBadge} Due
@@ -887,7 +903,7 @@ export default function Influencers() {
                   <td className="px-4 py-3 text-gray-400">{lead.fields['How Discovered'] || '—'}</td>
                   <td className="px-4 py-3 flex items-center gap-2">
                     <select
-                      value={lead.fields['Outreach Status'] || 'Pending'}
+                      value={lead.fields['Outreach Status'] || 'Ready to Contact'}
                       onChange={e => updateLeadStatus(lead.id, e.target.value)}
                       className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white focus:outline-none"
                     >
