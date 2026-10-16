@@ -3,7 +3,7 @@ import { getRecords, createRecord, createRecords, updateRecord, deleteRecord } f
 import CsvImport from '../components/CsvImport'
 import { buildAgreement } from '../../lib/agreement-template.js'
 
-const OUTREACH_STATUSES = ['Ready to Contact', 'DM Sent', 'Follow-up 1', 'Follow-up 2', 'Declined', 'Re-engage']
+const OUTREACH_STATUSES = ['Ready to Contact', 'DM Sent', 'Engaged', 'Follow-up 1', 'Follow-up 2', 'Declined', 'Re-engage']
 
 // Tab keys (internal) → user-facing labels.
 const TAB_LABELS = {
@@ -23,15 +23,16 @@ const STATUS_SORT_GROUP = {
   'Ready to Contact': 0,
   'Ready to Contact': 1,
   'DM Sent': 2,
-  'Follow-up 1': 3,
-  'Follow-up 2': 4,
-  'Re-engage': 5,
+  'Engaged': 3,
+  'Follow-up 1': 4,
+  'Follow-up 2': 5,
+  'Re-engage': 6,
   'Declined': 99
 }
 
 // Statuses visible on the Leads tab (Sample Sent and unknowns are excluded).
 const LEADS_TAB_STATUSES = new Set([
-  'Ready to Contact', 'DM Sent', 'Follow-up 1', 'Follow-up 2', 'Re-engage', 'Declined'
+  'Ready to Contact', 'DM Sent', 'Engaged', 'Follow-up 1', 'Follow-up 2', 'Re-engage', 'Declined'
 ])
 
 // Status → sent-date field on Leads. Used both for stamping on advancement
@@ -44,9 +45,11 @@ const STAGE_SENT_DATE_FIELD = {
 }
 
 // Status → set of stages already sent (drives card-vs-header rendering).
+// Engaged is a branch, not a chain step: initial DM went out and they replied.
 const STATUS_TO_SENT_STAGES = {
   'Ready to Contact': new Set(),
   'DM Sent': new Set(['initial']),
+  'Engaged': new Set(['initial']),
   'Follow-up 1': new Set(['initial', 'fu1']),
   'Follow-up 2': new Set(['initial', 'fu1', 'fu2']),
   'Re-engage': new Set(['initial', 'fu1', 'fu2', 'reengage'])
