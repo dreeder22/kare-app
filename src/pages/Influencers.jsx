@@ -60,14 +60,15 @@ const NEXT_STATUS = {
   'Follow-up 2': 'Re-engage'
 }
 
-// Stage metadata for the 5 message slots in the expanded row.
+// Stage metadata for the message slots in the expanded row.
 // `stage` keys map to STAGE_SENT_DATE_FIELD / STATUS_TO_SENT_STAGES.
-// Comment is special-cased: gated=false means it's always active (no modal).
+// Details DM is special-cased: gated=false means it's always a copy-ready
+// card (sent ad-hoc when the creator replies asking for details, not on a timer).
 const STAGE_DEFS = [
   { stage: 'initial',  label: 'Initial DM',  field: 'Initial DM',         gated: true,  prevStage: null },
-  { stage: 'comment',  label: 'Comment',     field: 'Comment Text',       gated: false, prevStage: null },
+  { stage: 'details',  label: 'Details DM',  field: 'Details DM',         gated: false, prevStage: null },
   { stage: 'fu1',      label: 'Follow-up 1', field: 'Follow-up 1',        gated: true,  prevStage: 'initial' },
-  { stage: 'fu2',      label: 'Follow-up 2', field: 'Follow-up 2',        gated: true,  prevStage: 'fu1' },
+  { stage: 'fu2',      label: 'Follow-up 2', field: 'Follow-up 2',         gated: true,  prevStage: 'fu1' },
   { stage: 'reengage', label: 'Re-engage',   field: 'Re-engage Message',  gated: true,  prevStage: 'fu2' }
 ]
 
@@ -285,32 +286,13 @@ export default function Influencers() {
   }
 
   async function generateDM(lead) {
-    const handle = lead.fields['Handle']
+    const handle = String(lead.fields['Handle'] || '').replace(/^@/, '')
+    const name = lead.fields['Full Name'] || ''
     const bio = lead.fields['Bio'] || ''
     const followers = lead.fields['Followers'] || 0
-    const platform = lead.fields['Platform'] || 'Instagram'
-    const location = lead.fields['Location'] || ''
-    const nicheTags = lead.fields['Niche Tags'] || []
-
-    // Brand voice: read from the Brand Settings table when it exists,
-    // otherwise fall back to built-in defaults so generation never breaks.
-    let brandSettings = {
-      'Brand Name': 'kāre',
-      'Tone': 'warm, confident, witty, quiet confidence',
-      'Products': 'Premium grass-fed New Zealand colostrum',
-      'Primary Audience': 'health-conscious adults',
-      'Ideal Creators': 'wellness, gut health, longevity and biohacking creators',
-      'Commission Rate': '10%'
-    }
-    try {
-      const brandSettingsRecords = await getRecords('Brand Settings')
-      if (brandSettingsRecords.length > 0) {
-        brandSettings = {}
-        brandSettingsRecords.forEach(r => { brandSettings[r.fields['Setting Name']] = r.fields['Value'] })
-      }
-    } catch {
-      // table missing — stick with defaults
-    }
+    // Bio carries "why-fit | Niche: X" from CSV imports — extract the niche for personalization.
+    const nicheMatch = String(bio).match(/Niche:\s*([^|]+)/)
+    const niche = nicheMatch ? nicheMatch[1].trim() : ''
 
     setGenerating(lead.id)
 
@@ -320,15 +302,7 @@ export default function Influencers() {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          lead: {
-            handle,
-            bio,
-            followers: followers.toLocaleString(),
-            platform,
-            location,
-            nicheTags: Array.isArray(nicheTags) ? nicheTags.join(', ') : nicheTags
-          },
-          brandSettings
+          lead: { handle, name, bio, followers: Number(followers).toLocaleString(), niche }
         })
       })
 
@@ -337,11 +311,10 @@ export default function Influencers() {
 
       const messageFields = {
         'Handle': handle,
-        'Initial DM': messages.initialDM,
-        'Comment Text': messages.comment,
+        'Initial DM': messages.message1,
+        'Details DM': messages.message2,
         'Follow-up 1': messages.followUp1,
         'Follow-up 2': messages.followUp2,
-        'Re-engage Message': messages.reEngage,
         'Date Generated': new Date().toISOString().split('T')[0]
       }
 
